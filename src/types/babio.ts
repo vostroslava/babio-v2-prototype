@@ -1,6 +1,9 @@
 export type BabyFeedingStyle = 'breast' | 'bottle' | 'combo'
 export type BabySleepSetup = 'bassinet' | 'crib' | 'shared-room'
+export type BabyFocusArea = 'sleep' | 'feeding' | 'comfort' | 'routine'
 export type BabioLogKind = 'sleep' | 'feed' | 'diaper' | 'comfort' | 'routine'
+export type ExploreSection = 'guides' | 'sleep' | 'community'
+export type CommunityTopic = 'night-wakes' | 'feeding' | 'crying' | 'routine' | 'pediatrician'
 
 export interface BabyProfileV2 {
   id: string
@@ -10,6 +13,9 @@ export interface BabyProfileV2 {
   avatarEmoji: string
   feedingStyle: BabyFeedingStyle
   sleepSetup: BabySleepSetup
+  focusAreas: BabyFocusArea[]
+  careNotes: string
+  updatedAt: string
 }
 
 export interface BabioLogEntry {
@@ -87,4 +93,16 @@ export interface QuickLogPreset {
   label: string
   detail: string
   askPrompt: string
+}
+
+export interface CommunityStory {
+  id: string
+  topic: CommunityTopic
+  ageRangeLabel: string
+  topicLabel: string
+  title: string
+  summary: string
+  parentSignal: string
+  askPrompt: string
+  safetyNote: string
 }

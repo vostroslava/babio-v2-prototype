@@ -4,6 +4,7 @@ import { join } from 'node:path'
 const root = process.cwd()
 const babioSource = readFileSync(join(root, 'src/data/babio.ts'), 'utf8')
 const guidanceSource = readFileSync(join(root, 'src/data/guidanceRules.ts'), 'utf8')
+const communitySource = readFileSync(join(root, 'src/data/communityStories.ts'), 'utf8')
 
 const unsafeCopy = [
   'diagnose',
@@ -39,6 +40,7 @@ const unsafeCopy = [
 const visibleData = [
   babioSource.replace(/export const unsafeCopy = \[[\s\S]*?\]\n/, ''),
   guidanceSource,
+  communitySource,
 ].join('\n')
 const normalized = visibleData.toLowerCase()
 const hits = unsafeCopy.filter((phrase) => normalized.includes(phrase))
@@ -52,6 +54,10 @@ if (hits.length > 0) {
 const requiredRoutes = [
   'baby-woke-up-again',
   'night-reset-woke-again',
+  'personalized-guidance-cta',
+  'profile-overview',
+  'community-to-guidance',
+  'profile-pediatrician-summary',
   'short-nap-reset',
   'bedtime-reset',
   'early-morning-wake',

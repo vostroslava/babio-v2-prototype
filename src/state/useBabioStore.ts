@@ -1,8 +1,11 @@
 import { useCallback, useState } from 'react'
 import type {
+  BabyFocusArea,
+  BabyFeedingStyle,
   BabioLogEntry,
   BabioNoteEntry,
   BabioStoreState,
+  BabySleepSetup,
   GuidanceDecisionV2,
   GuidanceResultV2,
   QuickLogPreset,
@@ -21,6 +24,9 @@ const defaultState: BabioStoreState = {
     avatarEmoji: '🙂',
     feedingStyle: 'combo',
     sleepSetup: 'bassinet',
+    focusAreas: ['sleep', 'feeding'],
+    careNotes: 'Night wakes, calm resets, and keeping feeds simple.',
+    updatedAt: '2026-07-02T03:05:00.000Z',
   },
   logs: [
     {
@@ -115,12 +121,50 @@ export function useBabioStore() {
     setState(next)
   }, [])
 
+  const updateProfile = useCallback(
+    (patch: {
+      name?: string
+      ageWeeks?: number
+      avatarEmoji?: string
+      feedingStyle?: BabyFeedingStyle
+      sleepSetup?: BabySleepSetup
+      focusAreas?: BabyFocusArea[]
+      careNotes?: string
+    }) => {
+      commit((current) => {
+        const nextAgeWeeks =
+          typeof patch.ageWeeks === 'number' && Number.isFinite(patch.ageWeeks) && patch.ageWeeks > 0
+            ? Math.round(patch.ageWeeks)
+            : current.profile.ageWeeks
+        const nextName = patch.name?.trim() || current.profile.name
+        const nextAvatar = patch.avatarEmoji?.trim() || current.profile.avatarEmoji
+
+        return {
+          ...current,
+          profile: {
+            ...current.profile,
+            ...patch,
+            name: nextName,
+            avatarEmoji: nextAvatar,
+            ageWeeks: nextAgeWeeks,
+            ageLabel: formatAgeLabel(nextAgeWeeks),
+            focusAreas: patch.focusAreas && patch.focusAreas.length > 0 ? patch.focusAreas : current.profile.focusAreas,
+            careNotes: typeof patch.careNotes === 'string' ? patch.careNotes.trim() : current.profile.careNotes,
+            updatedAt: new Date().toISOString(),
+          },
+        }
+      })
+    },
+    [commit],
+  )
+
   return {
     state,
     addQuickLog,
     setLastAsk,
     addNoteFromGuidance,
     resetDemo,
+    updateProfile,
   }
 }
 
@@ -154,6 +198,12 @@ function normalizeState(raw: Partial<BabioStoreState>): BabioStoreState {
     profile: {
       ...fallback.profile,
       ...(raw.profile || {}),
+      focusAreas:
+        raw.profile && Array.isArray(raw.profile.focusAreas) && raw.profile.focusAreas.length > 0
+          ? raw.profile.focusAreas
+          : fallback.profile.focusAreas,
+      careNotes: raw.profile?.careNotes || fallback.profile.careNotes,
+      updatedAt: raw.profile?.updatedAt || fallback.profile.updatedAt,
     },
     logs: Array.isArray(raw.logs) ? raw.logs.filter(isLogEntry).slice(0, 24) : fallback.logs,
     notes: Array.isArray(raw.notes) ? raw.notes.filter(isNoteEntry).slice(0, 20) : fallback.notes,
@@ -216,6 +266,13 @@ function formatLogTime(date: Date) {
     hour: 'numeric',
     minute: '2-digit',
   }).format(date)
+}
+
+function formatAgeLabel(ageWeeks: number) {
+  if (ageWeeks < 8) return `${ageWeeks} wk`
+  if (ageWeeks < 52) return `${ageWeeks} wk`
+  const months = Math.round(ageWeeks / 4.345)
+  return `${months} mo`
 }
 
 function isLogEntry(value: unknown): value is BabioLogEntry {

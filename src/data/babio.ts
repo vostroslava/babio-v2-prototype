@@ -9,8 +9,11 @@ import type {
   FlowMoment,
   GuidanceResult,
   HomeState,
+  ExploreCommunityRecordState,
   LogItem,
   NoteEntry,
+  ProfileRecordState,
+  ProfileSummaryRecordState,
   SafetyGatewayState,
 } from '../types'
 
@@ -161,6 +164,103 @@ const nightResetNote: NoteEntry = {
     { label: 'Try now', body: 'Keep the room dim and interactions quiet for the next reset.' },
     { label: 'Watch', body: 'Whether this repeats for 3 nights · feed timing · wet diapers.' },
   ],
+}
+
+const profileHome: HomeState = {
+  statusBarTime: '8:05 AM',
+  title: 'Emma is doing okay.',
+  inputPlaceholder: 'Ask about sleep, feeding, crying...',
+  featureTitle: 'Emma, 9 wk',
+  featureBody: 'Mixed feeding · bassinet sleep · night wakes and calm resets.',
+  primaryAction: {
+    label: 'Open profile',
+    variant: 'primary',
+    action: 'open-profile',
+  },
+}
+
+const profileRecordState: ProfileRecordState = {
+  statusBarTime: '8:05 AM',
+  title: 'Today context',
+  subtitle: 'Used by Ask',
+  profile: {
+    name: 'Emma',
+    ageLabel: '9 wk',
+    avatarEmoji: '🙂',
+  },
+  facts: [
+    { icon: 'bottle', label: 'Feeding', value: 'Mixed' },
+    { icon: 'moon', label: 'Sleep', value: 'Bassinet' },
+    { icon: 'flag', label: 'Focus', value: 'Night wakes' },
+  ],
+  todayContext: [
+    { icon: 'moon', label: 'Last sleep', value: '2:40 AM wake' },
+    { icon: 'bottle', label: 'Last feed', value: '2:10 AM' },
+    { icon: 'note', label: 'Recent note', value: 'Night wake pattern' },
+  ],
+  primaryAction: {
+    label: 'Ask using this context',
+    variant: 'primary',
+    action: 'open-ask',
+  },
+}
+
+const profileSummaryRecordState: ProfileSummaryRecordState = {
+  statusBarTime: '8:05 AM',
+  title: 'Pediatrician prep',
+  subtitle: 'A short summary from Emma’s profile, logs, and notes.',
+  profile: {
+    name: 'Emma',
+    ageLabel: '9 wk',
+    avatarEmoji: '🙂',
+  },
+  notes: [
+    { label: 'Pattern', body: 'Woke at 2:40 AM and stayed awake 45 min.' },
+    { label: 'Context', body: 'Calm feed at 2:10 AM · bassinet · mixed feeding.' },
+    { label: 'Question', body: 'What should we watch if this repeats for several nights?' },
+  ],
+  primaryAction: {
+    label: 'Copy summary',
+    variant: 'primary',
+    action: 'copy-summary',
+  },
+}
+
+const communityRecordState: ExploreCommunityRecordState = {
+  statusBarTime: '8:05 AM',
+  title: 'Explore',
+  subtitle: 'Gentle guidance, sleep tools, and parent stories.',
+  story: {
+    ageRangeLabel: '8-10 weeks',
+    topicLabel: 'Night wakes',
+    title: 'My baby woke again after a calm feed.',
+    summary: 'Parents often recognize the loop: feed, short quiet stretch, then another wake.',
+    parentSignal: '18 parents saved this moment',
+    safetyNote:
+      'Parent stories are shared moments, not clinical advice. Babio checks Emma’s profile and recent log before suggesting a next step.',
+  },
+  primaryAction: {
+    label: 'Personalize for Emma',
+    variant: 'secondary',
+    action: 'open-ask',
+  },
+}
+
+const communityAsk: AskState = {
+  statusBarTime: '8:05 AM',
+  title: 'Ask Babio',
+  subtitle: 'Turn the shared moment into Emma’s next step.',
+  input: 'Emma woke again after a calm feed. What is one calm next step tonight?',
+  quickContext: [
+    { icon: 'baby', label: 'Emma', value: '9 wk' },
+    { icon: 'moon', label: 'Story', value: 'Night wake' },
+    { icon: 'note', label: 'Log', value: '2:40 AM' },
+  ],
+  primaryAction: {
+    label: 'Get Personalized Guidance',
+    variant: 'primary',
+    action: 'show-loading',
+  },
 }
 
 const feedingResult: GuidanceResult = {
@@ -776,6 +876,113 @@ export const flows: Record<FlowId, FlowDefinition> = {
       { atMs: 7200, screen: 'result' },
     ],
   },
+  'profile-overview': {
+    id: 'profile-overview',
+    title: 'Profile Overview',
+    description: 'Profile screencast: open Emma’s care context, then ask using that profile.',
+    version: 'v2',
+    moment: 'routine',
+    recordingDurationMs: 7200,
+    statusBarTime: '8:05 AM',
+    startTab: 'profile',
+    initialScreen: 'home',
+    manualSequence: ['home', 'profile', 'ask'],
+    screens: {
+      home: profileHome,
+      loading: {
+        title: 'Opening profile...',
+        items: ['Emma profile', 'Today context'],
+      },
+      profile: profileRecordState,
+      ask: {
+        ...nightResetAsk,
+        statusBarTime: '8:05 AM',
+        input: 'What should I do next based on Emma’s recent sleep and feeding?',
+      },
+    },
+    timeline: [
+      { atMs: 0, screen: 'home' },
+      { atMs: 900, screen: 'home', tapTarget: 'Open profile' },
+      { atMs: 1250, screen: 'profile' },
+      { atMs: 4300, screen: 'profile', tapTarget: 'Ask using this context' },
+      { atMs: 4700, screen: 'ask' },
+      { atMs: 7200, screen: 'ask' },
+    ],
+  },
+  'community-to-guidance': {
+    id: 'community-to-guidance',
+    title: 'Community to Guidance',
+    description: 'Explore screencast: a parent story routes into personalized Ask instead of open forum advice.',
+    version: 'v2',
+    moment: 'comfort',
+    recordingDurationMs: 8000,
+    statusBarTime: '8:05 AM',
+    startTab: 'explore',
+    initialScreen: 'exploreCommunity',
+    manualSequence: ['exploreCommunity', 'ask', 'guidancePreparing', 'result'],
+    screens: {
+      loading: {
+        title: 'Personalizing the story...',
+        items: ['Parent story', 'Emma profile', 'Safety signals'],
+      },
+      exploreCommunity: communityRecordState,
+      ask: communityAsk,
+      guidancePreparing: {
+        statusBarTime: '8:05 AM',
+        title: 'Ask Babio',
+        subtitle: 'Turn the shared moment into Emma’s next step.',
+        input: communityAsk.input,
+        contextCards: communityAsk.quickContext,
+        loadingTitle: 'Personalizing guidance',
+        loadingBody: 'Babio is checking Emma’s profile, latest log, and safety signals.',
+        loadingItems: ['Reading Emma’s profile + night wake log', 'Keeping parent stories separate from advice'],
+      },
+      result: ctaGuidanceResult,
+    },
+    timeline: [
+      { atMs: 0, screen: 'exploreCommunity' },
+      { atMs: 1400, screen: 'exploreCommunity', tapTarget: 'Personalize for Emma' },
+      { atMs: 1750, screen: 'ask' },
+      { atMs: 3100, screen: 'ask', tapTarget: 'Get Personalized Guidance' },
+      { atMs: 3450, screen: 'guidancePreparing' },
+      { atMs: 5050, screen: 'result' },
+      { atMs: 8000, screen: 'result' },
+    ],
+  },
+  'profile-pediatrician-summary': {
+    id: 'profile-pediatrician-summary',
+    title: 'Profile Pediatrician Summary',
+    description: 'Profile screencast: saved notes become a clean pediatrician-ready summary.',
+    version: 'v2',
+    moment: 'pediatrician',
+    recordingDurationMs: 6800,
+    statusBarTime: '8:05 AM',
+    startTab: 'profile',
+    initialScreen: 'profile',
+    manualSequence: ['profile', 'profileSummary'],
+    screens: {
+      loading: {
+        title: 'Preparing summary...',
+        items: ['Profile', 'Recent notes', 'Main question'],
+      },
+      profile: {
+        ...profileRecordState,
+        primaryAction: {
+          label: 'Prepare pediatrician summary',
+          variant: 'primary',
+          action: 'open-summary',
+        },
+      },
+      profileSummary: profileSummaryRecordState,
+    },
+    timeline: [
+      { atMs: 0, screen: 'profile' },
+      { atMs: 1300, screen: 'profile', tapTarget: 'Prepare pediatrician summary' },
+      { atMs: 1700, screen: 'profileSummary' },
+      { atMs: 5000, screen: 'profileSummary', tapTarget: 'Copy summary', toast: 'Summary copied' },
+      { atMs: 6800, screen: 'profileSummary', toast: 'Summary copied' },
+    ],
+  },
   ...scenarioFlows,
   'first-fever-safety': makeSafetyFlow(),
   'feeding-question': {
@@ -943,6 +1150,9 @@ export const flowOrder: FlowId[] = [
   'baby-woke-up-again',
   'night-reset-woke-again',
   'personalized-guidance-cta',
+  'profile-overview',
+  'community-to-guidance',
+  'profile-pediatrician-summary',
   'short-nap-reset',
   'bedtime-reset',
   'early-morning-wake',

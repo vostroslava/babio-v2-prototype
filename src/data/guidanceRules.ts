@@ -60,6 +60,10 @@ export function buildGuidanceResult(input: string, context: GuidanceContextV2): 
     return buildSafetyRoute(context.profile)
   }
 
+  if (hasAny(lowerInput, ['sleep', 'woke', 'wake', 'night', 'nap', 'bedtime'])) {
+    return buildSleepGuidance(context)
+  }
+
   if (hasAny(lowerInput, ['feed', 'feeding', 'bottle', 'hungry', 'milk', 'nursing'])) {
     return buildFeedingGuidance(context)
   }

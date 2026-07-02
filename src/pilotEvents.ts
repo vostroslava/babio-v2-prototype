@@ -3,6 +3,7 @@ export type PilotEventName =
   | 'ask_completed'
   | 'note_saved'
   | 'summary_copied'
+  | 'profile_updated'
   | 'demo_reset'
   | 'feedback_recorded'
 

@@ -5,12 +5,12 @@ import {
   Baby,
   Battery,
   Bell,
-  BookOpen,
   Check,
   ChevronDown,
   ChevronRight,
   CircleHelp,
   ClipboardList,
+  Compass,
   Copy,
   Droplets,
   Flag,
@@ -50,6 +50,7 @@ import {
   useSearchParams,
 } from 'react-router-dom'
 import { babyProfile, flowOrder, flows } from './data/babio'
+import { communityStories } from './data/communityStories'
 import { buildGuidanceResult, isSafetyRoute, quickLogPresets } from './data/guidanceRules'
 import { trackPilotEvent } from './pilotEvents'
 import { useBabioStore } from './state/useBabioStore'
@@ -68,6 +69,9 @@ import type {
   HomeState,
   LogItem,
   NoteEntry,
+  ExploreCommunityRecordState,
+  ProfileRecordState,
+  ProfileSummaryRecordState,
   RecordingBackground,
   RecordingFormat,
   RecordingOptions,
@@ -76,9 +80,12 @@ import type {
 } from './types'
 import type {
   BabyProfileV2,
+  BabyFocusArea,
   BabioLogEntry,
   BabioLogKind,
   BabioNoteEntry,
+  CommunityStory,
+  ExploreSection,
   GuidanceDecisionV2,
   GuidanceResultV2,
   SafetyRouteV2,
@@ -113,6 +120,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/studio" replace />} />
         <Route path="/studio" element={<StudioScreen />} />
+        <Route path="/app/:tab/:section" element={<AppTabRoute />} />
         <Route path="/app/:tab" element={<AppTabRoute />} />
         <Route path="/flow/:flowId" element={<FlowRoute mode="flow" />} />
         <Route path="/record/:flowId" element={<FlowRoute mode="record" />} />
@@ -157,7 +165,7 @@ function FlowRoute({ mode }: { mode: 'flow' | 'record' }) {
 }
 
 function AppTabRoute() {
-  const { tab } = useParams()
+  const { section, tab } = useParams()
   const appTab = normalizeAppTab(tab)
 
   return (
@@ -165,20 +173,22 @@ function AppTabRoute() {
       mode="flow"
       options={{ format: 'phone', background: 'navy', frame: 'phone', autoplay: false, speed: 1 }}
     >
-      <StaticAppScreen tab={appTab} />
+      <StaticAppScreen rawSection={section} rawTab={tab} tab={appTab} />
     </RecordingStage>
   )
 }
 
 function normalizeAppTab(tab: string | undefined): AppTab {
-  if (tab === 'home' || tab === 'ask' || tab === 'tracker' || tab === 'library' || tab === 'sleep') return tab
+  if (tab === 'home' || tab === 'ask' || tab === 'tracker' || tab === 'explore' || tab === 'profile') return tab
+  if (tab === 'library' || tab === 'sleep' || tab === 'community') return 'explore'
   if (tab === 'log' || tab === 'notes') return tab
   return 'home'
 }
 
 function canonicalAppTab(tab: AppTab): AppTab {
   if (tab === 'log') return 'tracker'
-  if (tab === 'notes') return 'library'
+  if (tab === 'library' || tab === 'sleep') return 'explore'
+  if (tab === 'notes') return 'profile'
   return tab
 }
 
@@ -341,6 +351,11 @@ function FlowRunner({
   }, [flow.id, flow.manualSequence.length, options.autoplay, screen])
 
   const advance = (action?: string) => {
+    if (action === 'copy-summary') {
+      setToast('Summary copied')
+      return
+    }
+
     if (action === 'save-note' && flow.id !== 'save-for-pediatrician' && !flow.screens.notes) {
       setToast('Saved to Notes')
       return
@@ -380,16 +395,29 @@ function FlowRunner({
 function statusBarTimeForScreen(flow: FlowDefinition, screen: ScreenKind) {
   if (screen === 'home' || screen === 'dailyHome') return flow.screens.home?.statusBarTime || flow.statusBarTime
   if (screen === 'ask') return flow.screens.ask?.statusBarTime || flow.statusBarTime
+  if (screen === 'profile') return flow.screens.profile?.statusBarTime || flow.statusBarTime
+  if (screen === 'profileSummary') return flow.screens.profileSummary?.statusBarTime || flow.statusBarTime
+  if (screen === 'exploreCommunity') return flow.screens.exploreCommunity?.statusBarTime || flow.statusBarTime
   if (screen === 'guidancePreparing') return flow.screens.guidancePreparing?.statusBarTime || flow.statusBarTime
   return flow.statusBarTime
 }
 
-function StaticAppScreen({ tab }: { tab: AppTab }) {
+function StaticAppScreen({
+  rawSection,
+  rawTab,
+  tab,
+}: {
+  rawSection?: string
+  rawTab?: string
+  tab: AppTab
+}) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { addNoteFromGuidance, addQuickLog, resetDemo, setLastAsk, state } = useBabioStore()
+  const { addNoteFromGuidance, addQuickLog, resetDemo, setLastAsk, state, updateProfile } = useBabioStore()
   const [toast, setToast] = useState<string | undefined>()
   const activeTab = canonicalAppTab(tab)
+  const exploreSection = resolveExploreSection(rawTab, rawSection)
+  const profileSection = resolveProfileSection(rawTab, rawSection)
   const sourceLogId = searchParams.get('log') || undefined
   const sourceLog = sourceLogId ? state.logs.find((entry) => entry.id === sourceLogId) : undefined
 
@@ -432,6 +460,22 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
     navigate(log ? `/app/ask?log=${log.id}` : '/app/ask')
   }
 
+  const handleAskFromProfile = () => {
+    const input = `What should I do next based on ${state.profile.name}'s recent sleep and feeding?`
+    startAsk(input, state.logs[0])
+  }
+
+  const handleAskFromCommunity = (story: CommunityStory) => {
+    const storyPrompt = story.askPrompt.replace(/\bEmma\b/g, state.profile.name)
+    const result = buildGuidanceResult(storyPrompt, {
+      profile: state.profile,
+      logs: state.logs,
+    })
+    setLastAsk(storyPrompt, result)
+    trackPilotEvent('ask_completed', { topic: result.kind === 'guidance' ? result.topic : 'safety', source: 'community_story', storyId: story.id })
+    navigate(`/app/ask?story=${story.id}`)
+  }
+
   const handleAddLog = (presetIndex: number) => {
     const entry = addQuickLog(quickLogPresets[presetIndex])
     trackPilotEvent('log_entry_created', { kind: entry.kind, label: entry.label })
@@ -456,7 +500,7 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
       sourceLogId: linkedLog?.id,
     })
     setToast('Saved to Notes')
-    navigate('/app/library')
+    navigate('/app/profile/notes')
   }
 
   const handleCopyNotes = () => {
@@ -483,7 +527,14 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
     navigate('/app/home')
   }
 
-  const statusBarTime = activeTab === 'home' || activeTab === 'ask' || activeTab === 'sleep' ? '3:14 AM' : '8:05 AM'
+  const handleProfileUpdate = (patch: Parameters<typeof updateProfile>[0]) => {
+    updateProfile(patch)
+    trackPilotEvent('profile_updated', { focusAreas: patch.focusAreas?.join(',') || state.profile.focusAreas.join(',') })
+    setToast('Profile updated')
+  }
+
+  const statusBarTime =
+    activeTab === 'home' || activeTab === 'ask' || (activeTab === 'explore' && exploreSection === 'sleep') ? '3:14 AM' : '8:05 AM'
 
   return (
     <>
@@ -522,20 +573,315 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
         {activeTab === 'library' ? (
           <LiveLibraryScreen notes={state.notes} onCopy={handleCopyNotes} onReset={handleResetDemo} profile={state.profile} />
         ) : null}
-        {activeTab === 'sleep' ? (
-          <LiveSleepScreen
-            logs={state.logs}
+        {activeTab === 'explore' ? (
+          <LiveExploreScreen
+            notes={state.notes}
+            onAskCommunity={handleAskFromCommunity}
             onAskSleep={() => {
               const sleepLog = state.logs.find((entry) => entry.kind === 'sleep') || state.logs[0]
               startAsk(sleepLog?.askPrompt || 'She woke again and I need one calm next step.', sleepLog)
             }}
+            onCopy={handleCopyNotes}
+            onReset={handleResetDemo}
+            onSectionChange={(section) => navigate(`/app/explore/${section}`)}
             profile={state.profile}
+            section={exploreSection}
+          />
+        ) : null}
+        {activeTab === 'profile' ? (
+          <LiveProfileScreen
+            logs={state.logs}
+            notes={state.notes}
+            onAskUsingContext={handleAskFromProfile}
+            onCopySummary={handleCopyNotes}
+            onEditProfile={handleProfileUpdate}
+            onOpenNotes={() => navigate('/app/profile/notes')}
+            profile={state.profile}
+            section={profileSection}
           />
         ) : null}
       </PhoneShell>
       {toast ? <Toast text={toast} /> : null}
     </>
   )
+}
+
+function resolveExploreSection(rawTab?: string, rawSection?: string): ExploreSection {
+  if (rawTab === 'sleep' || rawSection === 'sleep') return 'sleep'
+  if (rawTab === 'community' || rawSection === 'community') return 'community'
+  return 'guides'
+}
+
+function resolveProfileSection(rawTab?: string, rawSection?: string): ProfileSection {
+  if (rawTab === 'notes' || rawSection === 'notes') return 'notes'
+  return 'overview'
+}
+
+type ProfileSection = 'overview' | 'notes'
+
+function LiveProfileScreen({
+  logs,
+  notes,
+  onAskUsingContext,
+  onCopySummary,
+  onEditProfile,
+  onOpenNotes,
+  profile,
+  section,
+}: {
+  logs: BabioLogEntry[]
+  notes: BabioNoteEntry[]
+  onAskUsingContext: () => void
+  onCopySummary: () => void
+  onEditProfile: (patch: {
+    name?: string
+    ageWeeks?: number
+    avatarEmoji?: string
+    feedingStyle?: BabyProfileV2['feedingStyle']
+    sleepSetup?: BabyProfileV2['sleepSetup']
+    focusAreas?: BabyFocusArea[]
+    careNotes?: string
+  }) => void
+  onOpenNotes: () => void
+  profile: BabyProfileV2
+  section: ProfileSection
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const lastSleep = logs.find((entry) => entry.kind === 'sleep')
+  const lastFeed = logs.find((entry) => entry.kind === 'feed')
+  const latestNote = notes[0]
+
+  return (
+    <section className="app-screen profile-screen live-scroll-screen">
+      <AppHeader profile={profile} />
+      <div className="profile-hero">
+        <div className="profile-avatar-large" aria-hidden="true">
+          {profile.avatarEmoji}
+        </div>
+        <div>
+          <span>Primary profile</span>
+          <h1>{profile.name}</h1>
+          <p>
+            {profile.ageLabel} · {formatFeedingStyle(profile.feedingStyle)} · {formatSleepSetup(profile.sleepSetup)}
+          </p>
+        </div>
+        <button className="icon-button profile-edit-button" aria-label="Edit profile" type="button" onClick={() => setIsEditing((value) => !value)}>
+          <NotebookTabs aria-hidden="true" />
+        </button>
+      </div>
+
+      {isEditing ? (
+        <ProfileEditPanel
+          onCancel={() => setIsEditing(false)}
+          onSave={(patch) => {
+            onEditProfile(patch)
+            setIsEditing(false)
+          }}
+          profile={profile}
+        />
+      ) : null}
+
+      <GlassCard className="today-context-card">
+        <div className="live-card-heading">
+          <h2>Today context</h2>
+          <span>Used by Ask</span>
+        </div>
+        <div className="profile-context-rows">
+          <ProfileContextRow Icon={Moon} label="Last sleep" value={lastSleep ? `${lastSleep.time} · ${lastSleep.label}` : 'No sleep log yet'} />
+          <ProfileContextRow Icon={Milk} label="Last feed" value={lastFeed ? `${lastFeed.time} · ${lastFeed.label}` : 'No feed log yet'} />
+          <ProfileContextRow Icon={NotebookTabs} label="Recent note" value={latestNote?.title || 'No saved note yet'} />
+        </div>
+        <button className="action-button primary" type="button" onClick={onAskUsingContext}>
+          Ask using this context
+          <SendHorizontal aria-hidden="true" />
+        </button>
+      </GlassCard>
+
+      <div className="care-context-grid">
+        <CareContextTile Icon={Milk} label="Feeding style" value={formatFeedingStyle(profile.feedingStyle)} />
+        <CareContextTile Icon={Moon} label="Sleep setup" value={formatSleepSetup(profile.sleepSetup)} />
+        <CareContextTile Icon={Flag} label="Current focus" value={profile.focusAreas.map(formatFocusArea).join(', ')} />
+        <CareContextTile Icon={StickyNote} label="Care notes" value={profile.careNotes || 'No extra notes yet'} />
+      </div>
+
+      <GlassCard className="profile-notes-card">
+        <div className="live-card-heading">
+          <h2>{section === 'notes' ? 'Saved notes' : 'Pediatrician prep'}</h2>
+          <span>{notes.length} saved</span>
+        </div>
+        <PediatricianExportCard notes={notes} profile={profile} />
+        <div className="profile-note-preview-list">
+          {notes.slice(0, section === 'notes' ? 6 : 2).map((note) => (
+            <button className="profile-note-preview" key={note.id} type="button" onClick={onOpenNotes}>
+              <NotebookTabs aria-hidden="true" />
+              <span>
+                <strong>{note.title}</strong>
+                <small>{note.subtitle}</small>
+              </span>
+              <ChevronRight aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+        <div className="button-stack">
+          <button className="action-button primary" type="button" onClick={onCopySummary}>
+            <Copy aria-hidden="true" />
+            Prepare pediatrician summary
+          </button>
+          {section !== 'notes' ? (
+            <button className="action-button secondary" type="button" onClick={onOpenNotes}>
+              View saved notes
+            </button>
+          ) : null}
+        </div>
+      </GlassCard>
+    </section>
+  )
+}
+
+function ProfileContextRow({ Icon, label, value }: { Icon: LucideIcon; label: string; value: string }) {
+  return (
+    <div className="profile-context-row">
+      <Icon aria-hidden="true" />
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function CareContextTile({ Icon, label, value }: { Icon: LucideIcon; label: string; value: string }) {
+  return (
+    <GlassCard className="care-context-tile">
+      <Icon aria-hidden="true" />
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </GlassCard>
+  )
+}
+
+function ProfileEditPanel({
+  onCancel,
+  onSave,
+  profile,
+}: {
+  onCancel: () => void
+  onSave: (patch: {
+    name: string
+    ageWeeks: number
+    avatarEmoji: string
+    feedingStyle: BabyProfileV2['feedingStyle']
+    sleepSetup: BabyProfileV2['sleepSetup']
+    focusAreas: BabyFocusArea[]
+    careNotes: string
+  }) => void
+  profile: BabyProfileV2
+}) {
+  const [name, setName] = useState(profile.name)
+  const [ageWeeks, setAgeWeeks] = useState(String(profile.ageWeeks))
+  const [avatarEmoji, setAvatarEmoji] = useState(profile.avatarEmoji)
+  const [feedingStyle, setFeedingStyle] = useState(profile.feedingStyle)
+  const [sleepSetup, setSleepSetup] = useState(profile.sleepSetup)
+  const [focusAreas, setFocusAreas] = useState<BabyFocusArea[]>(profile.focusAreas)
+  const [careNotes, setCareNotes] = useState(profile.careNotes)
+  const focusOptions: BabyFocusArea[] = ['sleep', 'feeding', 'comfort', 'routine']
+
+  const toggleFocus = (focus: BabyFocusArea) => {
+    setFocusAreas((current) => {
+      if (current.includes(focus)) return current.filter((item) => item !== focus)
+      return [...current, focus]
+    })
+  }
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    onSave({
+      name,
+      ageWeeks: Number(ageWeeks) || profile.ageWeeks,
+      avatarEmoji,
+      feedingStyle,
+      sleepSetup,
+      focusAreas,
+      careNotes,
+    })
+  }
+
+  return (
+    <GlassCard className="profile-edit-panel">
+      <form onSubmit={submit}>
+        <div className="live-card-heading">
+          <h2>Update profile</h2>
+          <span>Local demo</span>
+        </div>
+        <label>
+          <span>Baby name</span>
+          <input value={name} onChange={(event) => setName(event.target.value)} />
+        </label>
+        <div className="profile-edit-grid">
+          <label>
+            <span>Age in weeks</span>
+            <input inputMode="numeric" value={ageWeeks} onChange={(event) => setAgeWeeks(event.target.value)} />
+          </label>
+          <label>
+            <span>Avatar</span>
+            <input value={avatarEmoji} onChange={(event) => setAvatarEmoji(event.target.value)} />
+          </label>
+        </div>
+        <label>
+          <span>Feeding style</span>
+          <select value={feedingStyle} onChange={(event) => setFeedingStyle(event.target.value as BabyProfileV2['feedingStyle'])}>
+            <option value="breast">Breastfeeding</option>
+            <option value="bottle">Bottle feeding</option>
+            <option value="combo">Mixed feeding</option>
+          </select>
+        </label>
+        <label>
+          <span>Sleep setup</span>
+          <select value={sleepSetup} onChange={(event) => setSleepSetup(event.target.value as BabyProfileV2['sleepSetup'])}>
+            <option value="bassinet">Bassinet</option>
+            <option value="crib">Crib</option>
+            <option value="shared-room">Shared room</option>
+          </select>
+        </label>
+        <div className="focus-toggle-group" aria-label="Current focus">
+          {focusOptions.map((focus) => (
+            <button className={focusAreas.includes(focus) ? 'is-selected' : ''} key={focus} type="button" onClick={() => toggleFocus(focus)}>
+              {formatFocusArea(focus)}
+            </button>
+          ))}
+        </div>
+        <label>
+          <span>Care notes</span>
+          <textarea value={careNotes} onChange={(event) => setCareNotes(event.target.value)} />
+        </label>
+        <div className="button-stack">
+          <button className="action-button primary" type="submit">
+            Save profile
+          </button>
+          <button className="action-button secondary" type="button" onClick={onCancel}>
+            Cancel
+          </button>
+        </div>
+      </form>
+    </GlassCard>
+  )
+}
+
+function formatFeedingStyle(style: BabyProfileV2['feedingStyle']) {
+  if (style === 'breast') return 'Breastfeeding'
+  if (style === 'bottle') return 'Bottle feeding'
+  return 'Mixed feeding'
+}
+
+function formatSleepSetup(setup: BabyProfileV2['sleepSetup']) {
+  if (setup === 'crib') return 'Crib'
+  if (setup === 'shared-room') return 'Shared room'
+  return 'Bassinet'
+}
+
+function formatFocusArea(focus: BabyFocusArea) {
+  if (focus === 'feeding') return 'Feeding'
+  if (focus === 'comfort') return 'Comfort'
+  if (focus === 'routine') return 'Routine'
+  return 'Sleep'
 }
 
 function LiveHomeScreen({
@@ -815,7 +1161,7 @@ function LiveAskScreen({
         <div className="ask-form-heading">
           <span>Personalized guidance</span>
           <h2>{lastAsk ? 'Ask another detail' : 'Tell Babio what happened'}</h2>
-          <p>Babio uses Emma’s profile, recent log, and safety signals before giving one next step.</p>
+          <p>Babio uses {profile.name}'s profile, recent log, and safety signals before giving one next step.</p>
         </div>
         <label className="sr-only" htmlFor="babio-guidance-input">
           What happened?
@@ -909,16 +1255,134 @@ function GuidancePreparingCard({
   )
 }
 
-function LiveSleepScreen({
-  logs,
+function LiveExploreScreen({
+  notes,
+  onAskCommunity,
   onAskSleep,
+  onCopy,
+  onReset,
+  onSectionChange,
+  profile,
+  section,
+}: {
+  notes: BabioNoteEntry[]
+  onAskCommunity: (story: CommunityStory) => void
+  onAskSleep: () => void
+  onCopy: () => void
+  onReset: () => void
+  onSectionChange: (section: ExploreSection) => void
+  profile: BabyProfileV2
+  section: ExploreSection
+}) {
+  return (
+    <section className="app-screen explore-screen live-scroll-screen">
+      <AppHeader profile={profile} />
+      <div className="premium-screen-title">
+        <h1>Explore</h1>
+        <p>Gentle guidance, sleep tools, and parent stories.</p>
+      </div>
+      <ExploreSegmentedControl active={section} onChange={onSectionChange} />
+      {section === 'guides' ? <GuideExploreSection notes={notes} onCopy={onCopy} onReset={onReset} profile={profile} /> : null}
+      {section === 'sleep' ? <SleepExploreSection onAskSleep={onAskSleep} /> : null}
+      {section === 'community' ? <CommunityStoriesSection onAskCommunity={onAskCommunity} profile={profile} /> : null}
+    </section>
+  )
+}
+
+function ExploreSegmentedControl({
+  active,
+  onChange,
+}: {
+  active: ExploreSection
+  onChange: (section: ExploreSection) => void
+}) {
+  const items: { label: string; section: ExploreSection }[] = [
+    { label: 'Guides', section: 'guides' },
+    { label: 'Sleep', section: 'sleep' },
+    { label: 'Community', section: 'community' },
+  ]
+
+  return (
+    <div className="explore-segmented-control" role="tablist" aria-label="Explore sections">
+      {items.map((item) => (
+        <button
+          aria-selected={active === item.section}
+          className={active === item.section ? 'is-selected' : ''}
+          key={item.section}
+          role="tab"
+          type="button"
+          onClick={() => onChange(item.section)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function GuideExploreSection({
+  notes,
+  onCopy,
+  onReset,
   profile,
 }: {
-  logs: BabioLogEntry[]
-  onAskSleep: () => void
+  notes: BabioNoteEntry[]
+  onCopy: () => void
+  onReset: () => void
   profile: BabyProfileV2
 }) {
-  const sleepLog = logs.find((entry) => entry.kind === 'sleep')
+  const recommendations = [
+    { label: 'Sleep', title: 'The 5 S’s of a calmer reset', meta: '4 min guide' },
+    { label: 'Feeding', title: 'Latching and bottle rhythm', meta: '3 min guide' },
+    { label: 'Safety', title: 'When fever needs direct help', meta: 'Checklist' },
+  ]
+
+  return (
+    <>
+      <div className="library-search" role="search">
+        <Search aria-hidden="true" />
+        <span>Search advice, notes, and guides...</span>
+      </div>
+      <GlassCard className="library-feature-card">
+        <img alt="" src={motherBabyCard} />
+        <div>
+          <span>Daily feature</span>
+          <h2>Why is my baby crying?</h2>
+          <p>Use recent sleep, feeding, and comfort logs before guessing.</p>
+        </div>
+      </GlassCard>
+      <div className="recommendation-list">
+        <div className="live-card-heading">
+          <h2>Recommended for {profile.name}</h2>
+          <span>Guides</span>
+        </div>
+        {recommendations.map((item) => (
+          <GlassCard className="recommendation-row" key={item.title}>
+            <span>{item.label}</span>
+            <div>
+              <strong>{item.title}</strong>
+              <small>{item.meta}</small>
+            </div>
+            <ChevronRight aria-hidden="true" />
+          </GlassCard>
+        ))}
+      </div>
+      <PediatricianExportCard notes={notes} profile={profile} />
+      <div className="button-stack">
+        <button className="action-button primary" type="button" onClick={onCopy}>
+          <Copy aria-hidden="true" />
+          Copy pediatrician summary
+        </button>
+        <button className="action-button secondary" type="button" onClick={onReset}>
+          <RotateCcw aria-hidden="true" />
+          Reset demo
+        </button>
+      </div>
+    </>
+  )
+}
+
+function SleepExploreSection({ onAskSleep }: { onAskSleep: () => void }) {
   const sounds = [
     { label: 'White noise', Icon: Volume2, tone: 'blush' },
     { label: 'Rain', Icon: Droplets, tone: 'lavender' },
@@ -927,13 +1391,12 @@ function LiveSleepScreen({
   ]
 
   return (
-    <section className="app-screen sleep-screen live-scroll-screen">
-      <AppHeader profile={profile} />
+    <>
       <GlassCard className="sleep-sanctuary-card">
         <Moon aria-hidden="true" />
         <div>
           <h1>Sleep sanctuary</h1>
-          <p>{sleepLog?.detail || 'A calm, low-stimulation reset for the next sleep window.'}</p>
+          <p>Curated sounds and calm context before the next sleep question.</p>
         </div>
       </GlassCard>
       <GlassCard className="sleep-player-card">
@@ -949,19 +1412,13 @@ function LiveSleepScreen({
           <span>1h</span>
         </div>
       </GlassCard>
-      <div className="sleep-library">
-        <div className="live-card-heading">
-          <h2>Sound library</h2>
-          <span>View all</span>
-        </div>
-        <div className="sleep-sound-grid">
-          {sounds.map(({ Icon, label, tone }) => (
-            <button className={`sleep-sound-tile ${tone}`} key={label} type="button">
-              <Icon aria-hidden="true" />
-              <strong>{label}</strong>
-            </button>
-          ))}
-        </div>
+      <div className="sleep-sound-grid">
+        {sounds.map(({ Icon, label, tone }) => (
+          <button className={`sleep-sound-tile ${tone}`} key={label} type="button">
+            <Icon aria-hidden="true" />
+            <strong>{label}</strong>
+          </button>
+        ))}
       </div>
       <GlassCard className="sleep-tip-card">
         <Lamp aria-hidden="true" />
@@ -974,7 +1431,60 @@ function LiveSleepScreen({
         Ask about tonight
         <SendHorizontal aria-hidden="true" />
       </button>
-    </section>
+    </>
+  )
+}
+
+function CommunityStoriesSection({
+  onAskCommunity,
+  profile,
+}: {
+  onAskCommunity: (story: CommunityStory) => void
+  profile: BabyProfileV2
+}) {
+  return (
+    <>
+      <GlassCard className="community-intro-card">
+        <div>
+          <span>Parent stories</span>
+          <h2>Moments other parents recognize</h2>
+          <p>Shared stories are starting points. Babio still personalizes the next step for {profile.name}.</p>
+        </div>
+      </GlassCard>
+      <div className="community-topic-strip" aria-label="Community topics">
+        <span>Wakes</span>
+        <span>Feeding</span>
+        <span>Crying</span>
+        <span>Routine</span>
+      </div>
+      <div className="community-story-list">
+        {communityStories.map((story) => (
+          <CommunityStoryCard babyName={profile.name} key={story.id} onAsk={() => onAskCommunity(story)} story={story} />
+        ))}
+      </div>
+      <GlassCard className="community-safety-note">
+        <ShieldPlus aria-hidden="true" />
+        <p>Parent stories are shared moments, not clinical advice. Babio checks profile, recent log, and safety signals before guidance.</p>
+      </GlassCard>
+    </>
+  )
+}
+
+function CommunityStoryCard({ babyName, onAsk, story }: { babyName: string; onAsk: () => void; story: CommunityStory }) {
+  return (
+    <GlassCard className="community-story-card">
+      <div className="community-story-meta">
+        <span>{story.ageRangeLabel}</span>
+        <span>{story.topicLabel}</span>
+      </div>
+      <h2>{story.title}</h2>
+      <p>{story.summary}</p>
+      <small>{story.parentSignal}</small>
+      <button className="action-button secondary" type="button" onClick={onAsk}>
+        Personalize for {babyName}
+        <SendHorizontal aria-hidden="true" />
+      </button>
+    </GlassCard>
   )
 }
 
@@ -1200,6 +1710,9 @@ function ScreenRenderer({
 }) {
   if (screen === 'home') return <HomeScreen state={flow.screens.home!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'dailyHome') return <DailyHomeScreen state={flow.screens.home!} onAction={onAction} tapTarget={tapTarget} />
+  if (screen === 'profile') return <ProfileRecordScreen state={flow.screens.profile!} onAction={onAction} tapTarget={tapTarget} />
+  if (screen === 'exploreCommunity') return <ExploreCommunityRecordScreen state={flow.screens.exploreCommunity!} onAction={onAction} tapTarget={tapTarget} />
+  if (screen === 'profileSummary') return <ProfileSummaryRecordScreen state={flow.screens.profileSummary!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'ask') return <AskScreen state={flow.screens.ask!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'loading') return <LoadingScreen state={flow.screens.loading} />
   if (screen === 'guidancePreparing') return <GuidancePreparingScreen state={flow.screens.guidancePreparing!} />
@@ -1280,13 +1793,24 @@ function StatusBar({ time }: { time: string }) {
 type BabyPillProfile = Pick<BabyProfileV2, 'name' | 'ageLabel' | 'avatarEmoji'>
 
 function AppHeader({ centered = false, profile }: { centered?: boolean; profile?: BabyPillProfile }) {
+  const profileContent = profile ? (
+    <Link className="header-profile-pill" to="/app/profile">
+      <BabyAvatar profile={profile} />
+      <span>
+        {profile.name}, {profile.ageLabel}
+      </span>
+    </Link>
+  ) : (
+    <>
+      <BabyAvatar profile={profile} />
+      <BabioLogo />
+    </>
+  )
+
   return (
     <header className={`app-header ${centered ? 'centered' : ''}`}>
       {centered ? <ArrowLeft className="back-icon" aria-label="Back" /> : null}
-      <div className="brand-cluster">
-        <BabyAvatar profile={profile} />
-        <BabioLogo />
-      </div>
+      <div className="brand-cluster">{profileContent}</div>
       <button className="notification-button" aria-label="Notifications" type="button">
         <Bell aria-hidden="true" />
       </button>
@@ -1315,6 +1839,120 @@ function BabySwitcher({ profile = babyProfile }: { profile?: BabyPillProfile }) 
       </strong>
       <ChevronDown aria-hidden="true" />
     </div>
+  )
+}
+
+function ProfileRecordScreen({
+  state,
+  onAction,
+  tapTarget,
+}: {
+  state: ProfileRecordState
+  onAction: (action?: string) => void
+  tapTarget?: string
+}) {
+  return (
+    <section className="app-screen profile-screen">
+      <AppHeader profile={state.profile} />
+      <div className="profile-hero">
+        <div className="profile-avatar-large" aria-hidden="true">
+          {state.profile.avatarEmoji}
+        </div>
+        <div>
+          <span>Primary profile</span>
+          <h1>{state.profile.name}</h1>
+          <p>{state.profile.ageLabel} · personalized care context</p>
+        </div>
+      </div>
+      <div className="care-context-grid">
+        {state.facts.map((fact) => (
+          <CareContextTile Icon={iconComponentForName(fact.icon)} key={`${fact.label}-${fact.value}`} label={fact.label} value={fact.value} />
+        ))}
+      </div>
+      <GlassCard className="today-context-card">
+        <div className="live-card-heading">
+          <h2>{state.title}</h2>
+          <span>{state.subtitle}</span>
+        </div>
+        <div className="profile-context-rows">
+          {state.todayContext.map((item) => (
+            <ProfileContextRow Icon={iconComponentForName(item.icon)} key={`${item.label}-${item.value}`} label={item.label} value={item.value} />
+          ))}
+        </div>
+        <ActionButtonView action={state.primaryAction} onAction={onAction} tapTarget={tapTarget} />
+      </GlassCard>
+    </section>
+  )
+}
+
+function ExploreCommunityRecordScreen({
+  state,
+  onAction,
+  tapTarget,
+}: {
+  state: ExploreCommunityRecordState
+  onAction: (action?: string) => void
+  tapTarget?: string
+}) {
+  return (
+    <section className="app-screen explore-screen">
+      <AppHeader />
+      <div className="premium-screen-title">
+        <h1>{state.title}</h1>
+        <p>{state.subtitle}</p>
+      </div>
+      <ExploreSegmentedControl active="community" onChange={() => undefined} />
+      <GlassCard className="community-story-card hero-story-card">
+        <div className="community-story-meta">
+          <span>{state.story.ageRangeLabel}</span>
+          <span>{state.story.topicLabel}</span>
+        </div>
+        <h2>{state.story.title}</h2>
+        <p>{state.story.summary}</p>
+        <small>{state.story.parentSignal}</small>
+        <ActionButtonView action={state.primaryAction} onAction={onAction} tapTarget={tapTarget} />
+      </GlassCard>
+      <GlassCard className="community-safety-note">
+        <ShieldPlus aria-hidden="true" />
+        <p>{state.story.safetyNote}</p>
+      </GlassCard>
+    </section>
+  )
+}
+
+function ProfileSummaryRecordScreen({
+  state,
+  onAction,
+  tapTarget,
+}: {
+  state: ProfileSummaryRecordState
+  onAction: (action?: string) => void
+  tapTarget?: string
+}) {
+  return (
+    <section className="app-screen profile-screen">
+      <AppHeader centered profile={state.profile} />
+      <h1>{state.title}</h1>
+      <p className="screen-subtitle">{state.subtitle}</p>
+      <GlassCard className="pediatrician-export-card summary-record-card">
+        <div className="note-title">
+          <ShieldPlus aria-hidden="true" />
+          <div>
+            <h2>Pediatrician summary</h2>
+            <p>{state.profile.name}, {state.profile.ageLabel} · ready to copy</p>
+          </div>
+        </div>
+        {state.notes.map((note) => (
+          <section className="note-section" key={note.label}>
+            <h3>{note.label}</h3>
+            <p>{note.body}</p>
+          </section>
+        ))}
+      </GlassCard>
+      <div className="button-stack">
+        <ActionButtonView action={state.primaryAction} onAction={onAction} tapTarget={tapTarget} />
+      </div>
+    </section>
   )
 }
 
@@ -1789,8 +2427,8 @@ const navItems: { tab: AppTab; label: string; Icon: LucideIcon; to: string }[] =
   { tab: 'home', label: 'Home', Icon: Home, to: '/app/home' },
   { tab: 'tracker', label: 'Tracker', Icon: ClipboardList, to: '/app/tracker' },
   { tab: 'ask', label: 'Ask', Icon: MessageCircle, to: '/app/ask' },
-  { tab: 'library', label: 'Library', Icon: BookOpen, to: '/app/library' },
-  { tab: 'sleep', label: 'Sleep', Icon: Headphones, to: '/app/sleep' },
+  { tab: 'explore', label: 'Explore', Icon: Compass, to: '/app/explore' },
+  { tab: 'profile', label: 'Profile', Icon: Baby, to: '/app/profile' },
 ]
 
 function BottomNav({ activeTab, recording }: { activeTab: AppTab; recording: boolean }) {

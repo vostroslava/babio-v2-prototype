@@ -2,6 +2,9 @@ export type FlowId =
   | 'baby-woke-up-again'
   | 'night-reset-woke-again'
   | 'personalized-guidance-cta'
+  | 'profile-overview'
+  | 'community-to-guidance'
+  | 'profile-pediatrician-summary'
   | 'short-nap-reset'
   | 'bedtime-reset'
   | 'early-morning-wake'
@@ -17,7 +20,7 @@ export type FlowId =
   | 'doctor-visit-prep'
   | 'first-fever-safety'
 
-export type AppTab = 'home' | 'ask' | 'tracker' | 'library' | 'sleep' | 'log' | 'notes'
+export type AppTab = 'home' | 'ask' | 'tracker' | 'explore' | 'profile' | 'library' | 'sleep' | 'log' | 'notes'
 export type RecordingFormat = '9x16' | '4x5' | 'phone'
 export type RecordingBackground = 'green' | 'navy' | 'transparent-like'
 export type FrameMode = 'phone' | 'screen'
@@ -28,6 +31,9 @@ export type ScreenKind =
   | 'ask'
   | 'log'
   | 'notes'
+  | 'profile'
+  | 'profileSummary'
+  | 'exploreCommunity'
   | 'loading'
   | 'guidancePreparing'
   | 'result'
@@ -171,10 +177,51 @@ export interface FlowScreens {
   ask?: AskState
   loading: LoadingState
   guidancePreparing?: GuidancePreparingState
+  profile?: ProfileRecordState
+  profileSummary?: ProfileSummaryRecordState
+  exploreCommunity?: ExploreCommunityRecordState
   result?: GuidanceResult
   safety?: SafetyGatewayState
   dailyBrief?: DailyBriefState
   notes?: NoteEntry
+}
+
+export interface ProfileRecordState {
+  statusBarTime: string
+  title: string
+  subtitle: string
+  profile: Pick<BabyProfile, 'name' | 'ageLabel' | 'avatarEmoji'>
+  facts: ContextCard[]
+  todayContext: ContextCard[]
+  primaryAction: ActionButton
+  secondaryAction?: ActionButton
+}
+
+export interface ProfileSummaryRecordState {
+  statusBarTime: string
+  title: string
+  subtitle: string
+  profile: Pick<BabyProfile, 'name' | 'ageLabel' | 'avatarEmoji'>
+  notes: {
+    label: string
+    body: string
+  }[]
+  primaryAction: ActionButton
+}
+
+export interface ExploreCommunityRecordState {
+  statusBarTime: string
+  title: string
+  subtitle: string
+  story: {
+    ageRangeLabel: string
+    topicLabel: string
+    title: string
+    summary: string
+    parentSignal: string
+    safetyNote: string
+  }
+  primaryAction: ActionButton
 }
 
 export interface FlowTimelineStep {
