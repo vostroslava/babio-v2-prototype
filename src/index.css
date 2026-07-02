@@ -2474,6 +2474,7 @@ a {
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(83, 64, 56, 0.09);
   border-radius: 28px 28px 0 0;
+  bottom: 0;
   box-shadow: 0 -16px 40px rgba(86, 68, 54, 0.1);
   grid-template-columns: repeat(5, 1fr);
   height: 88px;

@@ -794,7 +794,7 @@ function LiveAskScreen({
       <form className={`live-ask-form ${lastAsk ? 'compact' : ''}`} onSubmit={submitAsk}>
         <textarea value={input} onChange={(event) => setInput(event.target.value)} />
         <button className="action-button primary" type="submit">
-          Get one calm step
+          Get Personalized Guidance
         </button>
       </form>
       {!lastAsk ? (
