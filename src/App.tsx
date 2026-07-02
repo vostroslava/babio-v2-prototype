@@ -63,6 +63,7 @@ import type {
   FlowDefinition,
   FlowId,
   FlowMoment,
+  GuidancePreparingState,
   GuidanceResult,
   HomeState,
   LogItem,
@@ -329,7 +330,7 @@ function FlowRunner({
   const activeToast = options.autoplay ? currentTimeline.toast || toast : toast
 
   useEffect(() => {
-    if (options.autoplay || screen !== 'loading') return undefined
+    if (options.autoplay || (screen !== 'loading' && screen !== 'guidancePreparing')) return undefined
 
     const timer = window.setTimeout(() => {
       setManualIndex((index) => Math.min(index + 1, flow.manualSequence.length - 1))
@@ -379,6 +380,7 @@ function FlowRunner({
 function statusBarTimeForScreen(flow: FlowDefinition, screen: ScreenKind) {
   if (screen === 'home' || screen === 'dailyHome') return flow.screens.home?.statusBarTime || flow.statusBarTime
   if (screen === 'ask') return flow.screens.ask?.statusBarTime || flow.statusBarTime
+  if (screen === 'guidancePreparing') return flow.screens.guidancePreparing?.statusBarTime || flow.statusBarTime
   return flow.statusBarTime
 }
 
@@ -1170,6 +1172,21 @@ function iconComponentForLogKind(kind: BabioLogKind): LucideIcon {
   return Moon
 }
 
+function iconComponentForName(name?: string): LucideIcon {
+  if (name === 'baby') return Baby
+  if (name === 'bottle' || name === 'feed') return Milk
+  if (name === 'diaper') return Droplets
+  if (name === 'heart' || name === 'comfort') return Heart
+  if (name === 'flag' || name === 'routine') return Flag
+  if (name === 'lamp') return Lamp
+  if (name === 'note') return NotebookTabs
+  if (name === 'play') return Play
+  if (name === 'spark') return Sparkles
+  if (name === 'thermometer') return Thermometer
+  if (name === 'moon' || name === 'sleep') return Moon
+  return CircleHelp
+}
+
 function ScreenRenderer({
   flow,
   screen,
@@ -1185,6 +1202,7 @@ function ScreenRenderer({
   if (screen === 'dailyHome') return <DailyHomeScreen state={flow.screens.home!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'ask') return <AskScreen state={flow.screens.ask!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'loading') return <LoadingScreen state={flow.screens.loading} />
+  if (screen === 'guidancePreparing') return <GuidancePreparingScreen state={flow.screens.guidancePreparing!} />
   if (screen === 'result') return <GuidanceResultScreen result={flow.screens.result!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'safety') return <SafetyGatewayScreen state={flow.screens.safety!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'dailyBrief') return <DailyBriefScreen brief={flow.screens.dailyBrief!} onAction={onAction} />
@@ -1405,26 +1423,104 @@ function AskScreen({
       <AppHeader />
       <h1>{state.title}</h1>
       {state.subtitle ? <p className="screen-subtitle">{state.subtitle}</p> : null}
-      <GlassCard className="question-card">
-        <span>Question</span>
-        <p>{state.input}</p>
+      <GlassCard className="live-ask-form guidance-form-card static-guidance-form">
+        <div className="ask-form-heading">
+          <span>Personalized guidance</span>
+          <h2>Tell Babio what happened</h2>
+          <p>Babio uses Emma’s profile, recent log, and safety signals before giving one next step.</p>
+        </div>
+        <div className="readonly-guidance-input" aria-label="Question">
+          {state.input}
+        </div>
+        <div className="guidance-context-strip" aria-label="Guidance context">
+          {state.quickContext.slice(0, 3).map((item) => (
+            <GuidanceContextPill
+              Icon={iconComponentForName(item.icon)}
+              key={`${item.label}-${item.value}`}
+              label={item.label}
+              value={item.value}
+            />
+          ))}
+        </div>
+        <GuidanceSubmitAction action={state.primaryAction} onAction={onAction} tapTarget={tapTarget} />
       </GlassCard>
-      <div className="quick-context">
-        <h2>Quick context</h2>
-        <div>
-          {state.quickContext.map((item) => (
-            <ContextCard item={item} key={`${item.label}-${item.value}`} />
+      {state.chips ? <SupportChips chips={state.chips} /> : null}
+    </section>
+  )
+}
+
+function SupportChips({ chips }: { chips: string[] }) {
+  return (
+    <div className="support-chip-row">
+      {chips.map((chip) => (
+        <span key={chip}>{chip}</span>
+      ))}
+    </div>
+  )
+}
+
+function GuidanceSubmitAction({
+  action,
+  onAction,
+  tapTarget,
+}: {
+  action: ActionButton
+  onAction: (action?: string) => void
+  tapTarget?: string
+}) {
+  const isTapTarget = tapTarget === action.label
+
+  return (
+    <button
+      className={`action-button primary guidance-submit-button ${isTapTarget ? 'is-tap-target' : ''}`}
+      type="button"
+      onClick={() => onAction(action.action)}
+    >
+      <span>{action.label}</span>
+      <SendHorizontal aria-hidden="true" />
+      {isTapTarget ? <TapIndicator /> : null}
+    </button>
+  )
+}
+
+function GuidancePreparingScreen({ state }: { state: GuidancePreparingState }) {
+  return (
+    <section className="app-screen ask-screen">
+      <AppHeader />
+      <h1>{state.title}</h1>
+      <p className="screen-subtitle">{state.subtitle}</p>
+      <GlassCard className="live-ask-form guidance-form-card static-guidance-form is-preparing">
+        <div className="ask-form-heading">
+          <span>Personalized guidance</span>
+          <h2>Tell Babio what happened</h2>
+          <p>Babio uses Emma’s profile, recent log, and safety signals before giving one next step.</p>
+        </div>
+        <div className="readonly-guidance-input compact" aria-label="Question">
+          {state.input}
+        </div>
+        <button className="action-button primary guidance-submit-button" type="button" disabled>
+          <Sparkles aria-hidden="true" />
+          Preparing guidance...
+        </button>
+      </GlassCard>
+      <GlassCard className="guidance-preparing-card" role="status" aria-live="polite">
+        <div className="guidance-preparing-heading">
+          <Sparkles aria-hidden="true" />
+          <div>
+            <h2>{state.loadingTitle}</h2>
+            <p>{state.loadingBody}</p>
+          </div>
+        </div>
+        <div className="guidance-progress-line" aria-hidden="true" />
+        <div className="guidance-preparing-rows">
+          {state.loadingItems.map((row, index) => (
+            <div className="guidance-preparing-row" key={row}>
+              <span>{index + 1}</span>
+              <strong>{row}</strong>
+            </div>
           ))}
         </div>
-      </div>
-      {state.chips ? (
-        <div className="support-chip-row">
-          {state.chips.map((chip) => (
-            <span key={chip}>{chip}</span>
-          ))}
-        </div>
-      ) : null}
-      <ActionButtonView action={state.primaryAction} onAction={onAction} tapTarget={tapTarget} />
+      </GlassCard>
     </section>
   )
 }
@@ -1466,7 +1562,7 @@ function GuidanceResultScreen({
   tapTarget?: string
 }) {
   return (
-    <section className="app-screen result-screen">
+    <section className={`app-screen result-screen ${result.presentation === 'screencast' ? 'result-screen-compact' : ''}`}>
       <AppHeader centered />
       <h1>{result.title}</h1>
       <p className="screen-subtitle">{result.subtitle}</p>

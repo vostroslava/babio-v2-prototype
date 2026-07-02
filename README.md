@@ -34,6 +34,7 @@ http://127.0.0.1:5174/studio
 ## Recording URLs
 
 ```text
+http://127.0.0.1:5174/record/personalized-guidance-cta?autoplay=1&bg=navy&format=phone&frame=phone
 http://127.0.0.1:5174/record/baby-woke-up-again?autoplay=1&bg=green&format=9x16
 http://127.0.0.1:5174/record/feeding-question?autoplay=1&bg=green&format=9x16
 http://127.0.0.1:5174/record/is-this-normal?autoplay=1&bg=green&format=9x16
@@ -64,7 +65,7 @@ npm run test
 
 ## V2 Status
 
-- 16 total scripted flows in Studio.
+- 17 total scripted flows in Studio.
 - Live local core loop: Home, Tracker, Ask, Library, Sleep.
 - Premium light baby-care visual pass with warm surfaces, pastel actions, photo guidance card, and five-tab bottom navigation.
 - Safety Gateway flow: `/record/first-fever-safety?autoplay=1&bg=green&format=9x16`.

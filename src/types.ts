@@ -1,6 +1,7 @@
 export type FlowId =
   | 'baby-woke-up-again'
   | 'night-reset-woke-again'
+  | 'personalized-guidance-cta'
   | 'short-nap-reset'
   | 'bedtime-reset'
   | 'early-morning-wake'
@@ -28,6 +29,7 @@ export type ScreenKind =
   | 'log'
   | 'notes'
   | 'loading'
+  | 'guidancePreparing'
   | 'result'
   | 'safety'
   | 'dailyHome'
@@ -82,6 +84,7 @@ export interface GuidanceResult {
   safetyNote?: SafetyNote
   primaryAction: ActionButton
   secondaryAction?: ActionButton
+  presentation?: 'standard' | 'screencast'
 }
 
 export interface BriefSection {
@@ -104,6 +107,17 @@ export interface NoteEntry {
 export interface LoadingState {
   title: string
   items: string[]
+}
+
+export interface GuidancePreparingState {
+  statusBarTime: string
+  title: string
+  subtitle: string
+  input: string
+  contextCards: ContextCard[]
+  loadingTitle: string
+  loadingBody: string
+  loadingItems: string[]
 }
 
 export interface HomeState {
@@ -156,6 +170,7 @@ export interface FlowScreens {
   home?: HomeState
   ask?: AskState
   loading: LoadingState
+  guidancePreparing?: GuidancePreparingState
   result?: GuidanceResult
   safety?: SafetyGatewayState
   dailyBrief?: DailyBriefState

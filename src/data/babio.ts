@@ -131,6 +131,21 @@ const nightResetResult: GuidanceResult = {
   primaryAction: { label: 'Save to Notes', variant: 'primary', action: 'save-note' },
 }
 
+const ctaGuidanceResult: GuidanceResult = {
+  title: 'Personalized guidance',
+  subtitle: 'Based on Emma, 9 wk, and the latest log.',
+  contextCards: nightResetResult.contextCards,
+  mainCardTitle: 'Try first',
+  steps: nightResetResult.steps,
+  supportNote: 'If she stays unsettled, check diaper and comfort before changing the plan.',
+  safetyNote: {
+    tone: 'care',
+    text: 'Call your pediatrician promptly if breathing looks difficult, fever appears, wet diapers drop, or she is hard to wake.',
+  },
+  primaryAction: { label: 'Save guidance', variant: 'primary', action: 'save-note' },
+  presentation: 'screencast',
+}
+
 const nightResetNote: NoteEntry = {
   id: 'night-reset-v2-note',
   title: 'Night wake pattern',
@@ -724,6 +739,43 @@ export const flows: Record<FlowId, FlowDefinition> = {
       { atMs: 8200, screen: 'notes', toast: 'Saved to Notes' },
     ],
   },
+  'personalized-guidance-cta': {
+    id: 'personalized-guidance-cta',
+    title: 'CTA Guidance Screencast',
+    description: 'Hero screencast: tap Get Personalized Guidance, show safety/context checks, then reveal the answer.',
+    version: 'v2',
+    moment: 'sleep',
+    recordingDurationMs: 7200,
+    statusBarTime: '3:14 AM',
+    startTab: 'ask',
+    initialScreen: 'ask',
+    manualSequence: ['ask', 'guidancePreparing', 'result'],
+    screens: {
+      ask: nightResetAsk,
+      loading: {
+        title: 'Personalizing guidance...',
+        items: ['Profile + latest log', 'Safety signals', 'One next step'],
+      },
+      guidancePreparing: {
+        statusBarTime: '3:14 AM',
+        title: 'Ask Babio',
+        subtitle: 'A structured answer, not an open chat.',
+        input: nightResetAsk.input,
+        contextCards: nightResetAsk.quickContext,
+        loadingTitle: 'Personalizing guidance',
+        loadingBody: 'Babio is turning the context into one safe next step.',
+        loadingItems: ['Reading Emma’s profile + latest log', 'Checking safety signals before advice'],
+      },
+      result: ctaGuidanceResult,
+    },
+    timeline: [
+      { atMs: 0, screen: 'ask' },
+      { atMs: 1200, screen: 'ask', tapTarget: 'Get Personalized Guidance' },
+      { atMs: 1550, screen: 'guidancePreparing' },
+      { atMs: 3400, screen: 'result' },
+      { atMs: 7200, screen: 'result' },
+    ],
+  },
   ...scenarioFlows,
   'first-fever-safety': makeSafetyFlow(),
   'feeding-question': {
@@ -890,6 +942,7 @@ export const flows: Record<FlowId, FlowDefinition> = {
 export const flowOrder: FlowId[] = [
   'baby-woke-up-again',
   'night-reset-woke-again',
+  'personalized-guidance-cta',
   'short-nap-reset',
   'bedtime-reset',
   'early-morning-wake',
