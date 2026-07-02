@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   AlertTriangle,
+  ArrowBigUp,
   ArrowLeft,
   Baby,
   Battery,
@@ -12,14 +13,17 @@ import {
   ClipboardList,
   Compass,
   Copy,
+  Delete,
   Droplets,
   Flag,
+  Globe,
   Heart,
   Headphones,
   Home,
   Lamp,
   ListChecks,
   MessageCircle,
+  Mic,
   Milk,
   Moon,
   NotebookTabs,
@@ -339,6 +343,10 @@ function FlowRunner({
   const screen = options.autoplay ? currentTimeline.screen : flow.manualSequence[manualIndex]
   const tapTarget = options.autoplay ? currentTimeline.tapTarget : undefined
   const activeToast = options.autoplay ? currentTimeline.toast || toast : toast
+  const transitionKey =
+    screen === 'typingAsk' || screen === 'typingAskReady'
+      ? `${flow.id}-typingAskLive`
+      : `${flow.id}-${screen}-${timelineIndex}`
 
   useEffect(() => {
     if (options.autoplay || (screen !== 'loading' && screen !== 'guidancePreparing')) return undefined
@@ -382,10 +390,10 @@ function FlowRunner({
           className="screen-transition"
           exit={{ opacity: 0, y: -10, scale: 0.99 }}
           initial={{ opacity: 0, y: 14, scale: 0.985 }}
-          key={`${flow.id}-${screen}-${timelineIndex}`}
+          key={transitionKey}
           transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
         >
-          <ScreenRenderer flow={flow} screen={screen} onAction={advance} tapTarget={tapTarget} />
+          <ScreenRenderer flow={flow} screen={screen} onAction={advance} tapTarget={tapTarget} speed={options.speed} />
         </motion.div>
       </AnimatePresence>
       {activeToast ? <Toast text={activeToast} /> : null}
@@ -1704,11 +1712,13 @@ function ScreenRenderer({
   screen,
   onAction,
   tapTarget,
+  speed = 1,
 }: {
   flow: FlowDefinition
   screen: ScreenKind
   onAction: (action?: string) => void
   tapTarget?: string
+  speed?: number
 }) {
   if (screen === 'home') return <HomeScreen state={flow.screens.home!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'dailyHome') return <DailyHomeScreen state={flow.screens.home!} onAction={onAction} tapTarget={tapTarget} />
@@ -1719,9 +1729,11 @@ function ScreenRenderer({
     return (
       <TypingAskRecordScreen
         ready={screen === 'typingAskReady'}
+        submitting={tapTarget === 'keyboard-out'}
         state={flow.screens.typingAsk!}
         onAction={onAction}
         tapTarget={tapTarget}
+        speed={speed}
       />
     )
   }
@@ -2101,17 +2113,81 @@ function AskScreen({
 
 function TypingAskRecordScreen({
   ready,
+  submitting,
   state,
   onAction,
   tapTarget,
+  speed = 1,
 }: {
   ready: boolean
+  submitting: boolean
   state: TypingAskRecordState
   onAction: (action?: string) => void
   tapTarget?: string
+  speed?: number
 }) {
+  const fullText = state.typedText
+  const [visibleLength, setVisibleLength] = useState(0)
+  const [activeKey, setActiveKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (ready) {
+      setVisibleLength(fullText.length)
+      setActiveKey(null)
+      return
+    }
+
+    setVisibleLength(0)
+    setActiveKey(null)
+
+    const startDelay = 700 / speed
+    const charInterval = 55 / speed
+
+    let index = 0
+    let timeoutId: number
+    let intervalId: number
+    const keyReleaseTimers: number[] = []
+
+    timeoutId = window.setTimeout(() => {
+      intervalId = window.setInterval(() => {
+        if (index < fullText.length) {
+          const nextChar = fullText[index]
+          index++
+          setVisibleLength(index)
+
+          if (nextChar === ' ') {
+            setActiveKey('space')
+          } else {
+            setActiveKey(nextChar.toLowerCase())
+          }
+
+          const keyReleaseTimer = window.setTimeout(() => {
+            setActiveKey((prev) => {
+              if (nextChar === ' ' && prev === 'space') return null
+              if (nextChar.toLowerCase() === prev) return null
+              return prev
+            })
+          }, 110 / speed)
+          keyReleaseTimers.push(keyReleaseTimer)
+        } else {
+          setActiveKey(null)
+          window.clearInterval(intervalId)
+        }
+      }, charInterval)
+    }, startDelay)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      window.clearInterval(intervalId)
+      keyReleaseTimers.forEach(window.clearTimeout)
+    }
+  }, [fullText, ready, speed])
+
+  const displayedText = fullText.slice(0, visibleLength)
+  const showKeyboard = !submitting
+
   return (
-    <section className={`app-screen ask-screen typing-ask-screen ${ready ? 'is-ready' : ''}`}>
+    <section className={`app-screen ask-screen typing-ask-screen ${ready ? 'is-ready' : ''} ${submitting ? 'is-submitting' : ''}`}>
       <AppHeader profile={state.profile} />
       <h1>{state.title}</h1>
       <p className="screen-subtitle">{state.subtitle}</p>
@@ -2122,7 +2198,7 @@ function TypingAskRecordScreen({
           <p>Babio uses {state.profile.name}’s profile, recent log, and safety signals before giving one next step.</p>
         </div>
         <div className="readonly-guidance-input typing-guidance-input" aria-label="Typed question">
-          <span className="typing-text">{state.typedText}</span>
+          <span className="typing-text">{displayedText}</span>
           <span className="typing-caret" aria-hidden="true" />
         </div>
         <div className="guidance-context-strip compact" aria-label="Guidance context">
@@ -2135,8 +2211,13 @@ function TypingAskRecordScreen({
             />
           ))}
         </div>
-        {ready ? (
+        {ready && !submitting ? (
           <GuidanceSubmitAction action={state.primaryAction} onAction={onAction} tapTarget={tapTarget} />
+        ) : submitting ? (
+          <button className="action-button primary guidance-submit-button" type="button" disabled>
+            <Sparkles aria-hidden="true" />
+            Preparing guidance...
+          </button>
         ) : (
           <button className="action-button primary guidance-submit-button" type="button" disabled>
             <span>{state.primaryAction.label}</span>
@@ -2144,33 +2225,63 @@ function TypingAskRecordScreen({
           </button>
         )}
       </GlassCard>
-      <FakeIosKeyboard />
+      <AnimatePresence>
+        {showKeyboard && (
+          <FakeIosKeyboard key="fake-ios-keyboard" activeKey={activeKey || undefined} />
+        )}
+      </AnimatePresence>
     </section>
   )
 }
 
-function FakeIosKeyboard() {
+function FakeIosKeyboard({ activeKey }: { activeKey?: string }) {
   const rows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
 
   return (
-    <div className="fake-ios-keyboard" aria-hidden="true">
+    <motion.div
+      className="fake-ios-keyboard"
+      aria-hidden="true"
+      initial={{ y: '100%', opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: '100%', opacity: 0 }}
+      transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
+    >
       {rows.map((row, rowIndex) => (
         <div className={`keyboard-row row-${rowIndex + 1}`} key={row}>
-          {rowIndex === 2 ? <span className="keyboard-key utility">shift</span> : null}
-          {Array.from(row).map((letter) => (
-            <span className="keyboard-key" key={letter}>
-              {letter}
+          {rowIndex === 2 ? (
+            <span className="keyboard-key utility icon-key shift-key">
+              <ArrowBigUp aria-hidden="true" />
             </span>
-          ))}
-          {rowIndex === 2 ? <span className="keyboard-key utility">delete</span> : null}
+          ) : null}
+          {Array.from(row).map((letter) => {
+            const keyLower = letter.toLowerCase()
+            const isActive = activeKey === keyLower
+            return (
+              <span className={`keyboard-key ${isActive ? 'is-active' : ''}`} key={letter}>
+                {keyLower}
+                {isActive ? <span className="key-popover">{keyLower}</span> : null}
+              </span>
+            )
+          })}
+          {rowIndex === 2 ? (
+            <span className="keyboard-key utility icon-key delete-key">
+              <Delete aria-hidden="true" />
+            </span>
+          ) : null}
         </div>
       ))}
       <div className="keyboard-row row-4">
         <span className="keyboard-key utility wide">123</span>
-        <span className="keyboard-key space">space</span>
-        <span className="keyboard-key utility wide">return</span>
+        <span className="keyboard-key utility icon-key globe-key">
+          <Globe aria-hidden="true" />
+        </span>
+        <span className={`keyboard-key space ${activeKey === 'space' ? 'is-active' : ''}`}>space</span>
+        <span className="keyboard-key utility wide return-key">return</span>
+        <span className="keyboard-key utility icon-key mic-key">
+          <Mic aria-hidden="true" />
+        </span>
       </div>
-    </div>
+    </motion.div>
   )
 }
 

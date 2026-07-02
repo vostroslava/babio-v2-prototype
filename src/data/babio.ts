@@ -950,8 +950,9 @@ export const flows: Record<FlowId, FlowDefinition> = {
     timeline: [
       { atMs: 0, screen: 'typingAsk' },
       { atMs: 3300, screen: 'typingAskReady', tapTarget: 'Get Personalized Guidance' },
-      { atMs: 4300, screen: 'guidancePreparing' },
-      { atMs: 5500, screen: 'result' },
+      { atMs: 4300, screen: 'typingAskReady', tapTarget: 'keyboard-out' },
+      { atMs: 5200, screen: 'guidancePreparing' },
+      { atMs: 6400, screen: 'result' },
       { atMs: 7600, screen: 'result' },
     ],
   },

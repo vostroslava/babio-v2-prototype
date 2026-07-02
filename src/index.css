@@ -242,6 +242,11 @@ a {
   position: relative;
 }
 
+.phone-content:has(.typing-ask-screen) {
+  overflow: visible;
+  z-index: 8;
+}
+
 .screen-transition {
   height: 100%;
 }
@@ -1482,9 +1487,11 @@ a {
   width: clamp(20px, 5.3cqw, 26px);
 }
 
-.typing-ask-screen {
+.app-screen.typing-ask-screen {
   gap: clamp(8px, 2.25cqw, 12px);
-  padding-bottom: 92px;
+  overflow: visible;
+  padding-bottom: clamp(258px, 60cqw, 286px);
+  position: relative;
 }
 
 .typing-ask-screen h1 {
@@ -1519,12 +1526,8 @@ a {
 }
 
 .typing-text {
-  animation: typingReveal 2.25s steps(40, end) 0.55s both;
-  display: inline-block;
-  max-width: 100%;
-  overflow: hidden;
+  display: inline;
   vertical-align: bottom;
-  white-space: nowrap;
 }
 
 .typing-caret {
@@ -1539,7 +1542,6 @@ a {
 }
 
 .typing-ask-screen.is-ready .typing-text {
-  animation: none;
   width: auto;
   white-space: normal;
 }
@@ -1561,58 +1563,120 @@ a {
 }
 
 .fake-ios-keyboard {
-  animation: keyboardSlideUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
-  background: rgba(239, 232, 224, 0.96);
-  border: 1px solid rgba(83, 64, 56, 0.08);
-  border-radius: 22px 22px 18px 18px;
-  box-shadow: 0 -16px 34px rgba(86, 68, 54, 0.12);
+  background: linear-gradient(180deg, #d6d8de 0%, #cfd2d9 100%);
+  border-radius: 0 0 38px 38px;
+  border-top: 1px solid rgba(80, 86, 96, 0.2);
+  box-shadow: 0 -12px 28px rgba(86, 68, 54, 0.13);
   display: grid;
-  gap: 7px;
-  margin-top: auto;
-  padding: 10px 8px 12px;
+  gap: 8px;
+  left: 0;
+  margin-top: 0;
+  padding: 9px 6px 28px;
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  z-index: 30;
 }
 
 .keyboard-row {
-  display: flex;
-  gap: 5px;
-  justify-content: center;
+  display: grid;
+  gap: 6px;
+}
+
+.keyboard-row.row-1 {
+  grid-template-columns: repeat(10, minmax(0, 1fr));
 }
 
 .keyboard-row.row-2 {
-  padding: 0 13px;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+  padding: 0 20px;
+}
+
+.keyboard-row.row-3 {
+  grid-template-columns: 1.25fr repeat(7, minmax(0, 1fr)) 1.25fr;
+}
+
+.keyboard-row.row-4 {
+  grid-template-columns: 1.25fr 0.92fr 5.2fr 1.62fr 0.92fr;
+  padding-top: 2px;
 }
 
 .keyboard-key {
   align-items: center;
   background: rgba(255, 255, 255, 0.94);
-  border-radius: 8px;
-  box-shadow: 0 1px 0 rgba(83, 64, 56, 0.17), 0 3px 5px rgba(83, 64, 56, 0.08);
-  color: #2a2528;
+  border-radius: 6px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 1px 0 rgba(88, 92, 103, 0.32),
+    0 2px 4px rgba(87, 90, 98, 0.18);
+  color: #111216;
   display: inline-flex;
-  flex: 1 1 0;
-  font-size: clamp(12px, 3cqw, 14px);
-  font-weight: 760;
-  height: clamp(28px, 7.2cqw, 36px);
+  font-size: clamp(18px, 4.8cqw, 22px);
+  font-weight: 520;
+  height: clamp(39px, 10.2cqw, 45px);
   justify-content: center;
   min-width: 0;
-  text-transform: lowercase;
+  position: relative;
+  transition:
+    background-color 70ms ease-out,
+    box-shadow 70ms ease-out,
+    transform 70ms ease-out;
 }
 
 .keyboard-key.utility {
-  background: #d8d0c9;
-  color: #5c5559;
-  flex: 1.22 1 0;
-  font-size: clamp(8px, 2.2cqw, 11px);
+  background: #adb2bd;
+  color: #17191e;
+  font-size: clamp(13px, 3.25cqw, 15px);
+  font-weight: 500;
 }
 
-.keyboard-key.wide {
-  flex: 1.6 1 0;
+.keyboard-key.icon-key svg {
+  height: clamp(17px, 4.5cqw, 21px);
+  stroke-width: 2.35;
+  width: clamp(17px, 4.5cqw, 21px);
 }
 
 .keyboard-key.space {
-  flex: 4.6 1 0;
-  color: #7a7175;
-  font-size: clamp(10px, 2.7cqw, 13px);
+  color: #4b4f59;
+  font-size: clamp(13px, 3.35cqw, 15px);
+  font-weight: 500;
+}
+
+.keyboard-key.is-active {
+  background: #f9fafc !important;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 1px 0 rgba(88, 92, 103, 0.26),
+    0 5px 12px rgba(72, 76, 86, 0.2);
+  color: #0d0f13 !important;
+  transform: translateY(-1px);
+  z-index: 10;
+}
+
+.keyboard-key.space.is-active {
+  background: #f3f4f7 !important;
+}
+
+.key-popover {
+  align-items: center;
+  background: #ffffff;
+  border-radius: 10px 10px 8px 8px;
+  bottom: calc(100% + 5px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.92) inset,
+    0 7px 18px rgba(52, 56, 64, 0.24);
+  color: #111216;
+  display: flex;
+  font-size: clamp(23px, 6cqw, 28px);
+  font-weight: 500;
+  height: clamp(54px, 13cqw, 62px);
+  justify-content: center;
+  left: 50%;
+  min-width: clamp(42px, 10.8cqw, 50px);
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 40;
 }
 
 .guidance-preparing-card {
