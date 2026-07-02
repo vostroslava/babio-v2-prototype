@@ -8,7 +8,7 @@ This copy is the active V2 workspace. The original MVP remains at:
 /Volumes/KINGSTON/2026-07-01-BAB-EID-1915/BABIO_VIDEO_PROJECT/babio-mvp-emulator
 ```
 
-V2 is still not a production medical app. The near-term direction is: local profile, local logs, structured Ask, Notes, scenario library, Studio/Record compatibility, no backend, no auth, no free-form AI chat.
+V2 is still not a production medical app. The near-term direction is: local profile, local tracker, structured Ask, Library, Sleep surface, scenario library, Studio/Record compatibility, no backend, no auth, no free-form AI chat.
 
 Start from:
 
@@ -65,7 +65,8 @@ npm run test
 ## V2 Status
 
 - 16 total scripted flows in Studio.
-- Live local core loop: Home, Log, Ask, Notes.
+- Live local core loop: Home, Tracker, Ask, Library, Sleep.
+- Premium light baby-care visual pass with warm surfaces, pastel actions, photo guidance card, and five-tab bottom navigation.
 - Safety Gateway flow: `/record/first-fever-safety?autoplay=1&bg=green&format=9x16`.
 - PWA manifest + service worker shell.
 - Local pilot events in `localStorage` under `babio:v2-pilot-events`.

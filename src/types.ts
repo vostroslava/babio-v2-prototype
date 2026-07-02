@@ -16,7 +16,7 @@ export type FlowId =
   | 'doctor-visit-prep'
   | 'first-fever-safety'
 
-export type AppTab = 'home' | 'ask' | 'log' | 'notes'
+export type AppTab = 'home' | 'ask' | 'tracker' | 'library' | 'sleep' | 'log' | 'notes'
 export type RecordingFormat = '9x16' | '4x5' | 'phone'
 export type RecordingBackground = 'green' | 'navy' | 'transparent-like'
 export type FrameMode = 'phone' | 'screen'

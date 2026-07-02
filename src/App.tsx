@@ -4,6 +4,8 @@ import {
   ArrowLeft,
   Baby,
   Battery,
+  Bell,
+  BookOpen,
   Check,
   ChevronDown,
   ChevronRight,
@@ -13,6 +15,7 @@ import {
   Droplets,
   Flag,
   Heart,
+  Headphones,
   Home,
   Lamp,
   ListChecks,
@@ -20,15 +23,18 @@ import {
   Milk,
   Moon,
   NotebookTabs,
+  Pause,
   Play,
   Plus,
   RotateCcw,
+  Search,
   SendHorizontal,
   ShieldPlus,
   Signal,
   Sparkles,
   StickyNote,
   Thermometer,
+  Volume2,
   Wifi,
 } from 'lucide-react'
 import type { ComponentType, FormEvent, SVGProps } from 'react'
@@ -47,6 +53,7 @@ import { babyProfile, flowOrder, flows } from './data/babio'
 import { buildGuidanceResult, isSafetyRoute, quickLogPresets } from './data/guidanceRules'
 import { trackPilotEvent } from './pilotEvents'
 import { useBabioStore } from './state/useBabioStore'
+import motherBabyCard from './assets/mother-baby-card.webp'
 import type {
   ActionButton,
   AppTab,
@@ -150,7 +157,7 @@ function FlowRoute({ mode }: { mode: 'flow' | 'record' }) {
 
 function AppTabRoute() {
   const { tab } = useParams()
-  const appTab = ['home', 'ask', 'log', 'notes'].includes(tab || '') ? (tab as AppTab) : 'home'
+  const appTab = normalizeAppTab(tab)
 
   return (
     <RecordingStage
@@ -160,6 +167,18 @@ function AppTabRoute() {
       <StaticAppScreen tab={appTab} />
     </RecordingStage>
   )
+}
+
+function normalizeAppTab(tab: string | undefined): AppTab {
+  if (tab === 'home' || tab === 'ask' || tab === 'tracker' || tab === 'library' || tab === 'sleep') return tab
+  if (tab === 'log' || tab === 'notes') return tab
+  return 'home'
+}
+
+function canonicalAppTab(tab: AppTab): AppTab {
+  if (tab === 'log') return 'tracker'
+  if (tab === 'notes') return 'library'
+  return tab
 }
 
 function StudioScreen() {
@@ -368,11 +387,12 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
   const [searchParams] = useSearchParams()
   const { addNoteFromGuidance, addQuickLog, resetDemo, setLastAsk, state } = useBabioStore()
   const [toast, setToast] = useState<string | undefined>()
+  const activeTab = canonicalAppTab(tab)
   const sourceLogId = searchParams.get('log') || undefined
   const sourceLog = sourceLogId ? state.logs.find((entry) => entry.id === sourceLogId) : undefined
 
   useEffect(() => {
-    if (tab !== 'ask' || !sourceLog) return
+    if (activeTab !== 'ask' || !sourceLog) return
     if (state.lastAsk?.sourceLogId === sourceLog.id) return
 
     const result = buildGuidanceResult(sourceLog.askPrompt, {
@@ -389,7 +409,7 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
     state.lastAsk?.sourceLogId,
     state.logs,
     state.profile,
-    tab,
+    activeTab,
   ])
 
   useEffect(() => {
@@ -434,7 +454,7 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
       sourceLogId: linkedLog?.id,
     })
     setToast('Saved to Notes')
-    navigate('/app/notes')
+    navigate('/app/library')
   }
 
   const handleCopyNotes = () => {
@@ -461,12 +481,12 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
     navigate('/app/home')
   }
 
-  const statusBarTime = tab === 'home' || tab === 'ask' ? '3:14 AM' : '8:05 AM'
+  const statusBarTime = activeTab === 'home' || activeTab === 'ask' || activeTab === 'sleep' ? '3:14 AM' : '8:05 AM'
 
   return (
     <>
-      <PhoneShell activeTab={tab} frame="phone" statusBarTime={statusBarTime}>
-        {tab === 'home' ? (
+      <PhoneShell activeTab={activeTab} frame="phone" statusBarTime={statusBarTime}>
+        {activeTab === 'home' ? (
           <LiveHomeScreen
             logs={state.logs}
             onAddLog={() => handleAddLog(0)}
@@ -475,11 +495,10 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
               const latest = state.logs[0]
               startAsk(latest?.askPrompt || 'She woke again and I need one calm next step.', latest)
             }}
-            onReset={handleResetDemo}
             profile={state.profile}
           />
         ) : null}
-        {tab === 'ask' ? (
+        {activeTab === 'ask' ? (
           <LiveAskScreen
             lastAsk={state.lastAsk}
             logs={state.logs}
@@ -489,7 +508,7 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
             sourceLog={sourceLog}
           />
         ) : null}
-        {tab === 'log' ? (
+        {activeTab === 'tracker' ? (
           <LiveLogScreen
             logs={state.logs}
             onAddLog={handleAddLog}
@@ -498,8 +517,18 @@ function StaticAppScreen({ tab }: { tab: AppTab }) {
             profile={state.profile}
           />
         ) : null}
-        {tab === 'notes' ? (
-          <LiveNotesScreen notes={state.notes} onCopy={handleCopyNotes} onReset={handleResetDemo} profile={state.profile} />
+        {activeTab === 'library' ? (
+          <LiveLibraryScreen notes={state.notes} onCopy={handleCopyNotes} onReset={handleResetDemo} profile={state.profile} />
+        ) : null}
+        {activeTab === 'sleep' ? (
+          <LiveSleepScreen
+            logs={state.logs}
+            onAskSleep={() => {
+              const sleepLog = state.logs.find((entry) => entry.kind === 'sleep') || state.logs[0]
+              startAsk(sleepLog?.askPrompt || 'She woke again and I need one calm next step.', sleepLog)
+            }}
+            profile={state.profile}
+          />
         ) : null}
       </PhoneShell>
       {toast ? <Toast text={toast} /> : null}
@@ -512,53 +541,109 @@ function LiveHomeScreen({
   onAddLog,
   onAsk,
   onAskLatest,
-  onReset,
   profile,
 }: {
   logs: BabioLogEntry[]
   onAddLog: () => void
   onAsk: (input: string, log?: BabioLogEntry) => void
   onAskLatest: () => void
-  onReset: () => void
   profile: BabyProfileV2
 }) {
   const latest = logs[0]
+  const lastFeed = logs.find((entry) => entry.kind === 'feed')
+  const lastSleep = logs.find((entry) => entry.kind === 'sleep')
 
   return (
     <section className="app-screen home-screen live-scroll-screen">
       <AppHeader profile={profile} />
-      <div className="live-title-row">
-        <h1>One calm step for {profile.name}</h1>
-        <button aria-label="Reset demo state" className="icon-button" type="button" onClick={onReset}>
-          <RotateCcw aria-hidden="true" />
-        </button>
+      <div className="premium-home-hero">
+        <div>
+          <span>Good morning</span>
+          <h1>{profile.name} is doing okay.</h1>
+          <p>Babio keeps the next step clear, calm, and safe.</p>
+        </div>
       </div>
-      <div className="ask-bar live-ask-bar">
-        <button type="button" onClick={() => onAsk('She woke again and I need one calm next step.')}>
-          <span>Ask about sleep, feeding, crying...</span>
-        </button>
-        <button aria-label="Start ask" type="button" onClick={onAskLatest}>
+
+      <GlassCard className="premium-now-card">
+        <div>
+          <span>What matters now</span>
+          <h2>{latest ? latest.label : 'Start with one quick log'}</h2>
+          <p>{latest ? latest.detail : 'Add one quick log, then ask Babio what to try next.'}</p>
+        </div>
+        <div className="premium-status-grid">
+          <StatusMetric label="Last feed" value={lastFeed?.time || '2h ago'} tone="mint" />
+          <StatusMetric label="Last sleep" value={lastSleep?.time || '38m ago'} tone="lavender" />
+          <StatusMetric label="Watch next" value="Wake window" tone="blush" />
+        </div>
+        <button className="action-button primary premium-ask-cta" type="button" onClick={onAskLatest}>
+          Ask Babio
           <SendHorizontal aria-hidden="true" />
         </button>
+      </GlassCard>
+
+      <QuickActionTiles
+        onAsk={() => onAsk('She woke again and I need one calm next step.')}
+        onLog={onAddLog}
+        onSleep={onAskLatest}
+      />
+
+      <div className="premium-safety-note">
+        <ShieldPlus aria-hidden="true" />
+        <span>Babio flags when direct pediatric help is safer than app guidance.</span>
       </div>
-      <GlassCard className="feature-card live-focus-card">
+
+      <GlassCard className="premium-advice-card">
+        <img alt="" src={motherBabyCard} />
         <div>
-          <h2>Night reset</h2>
-          <p>{latest ? latest.detail : 'Add one quick log, then ask Babio what to try next.'}</p>
-          <small>Profile + latest log stay on this device.</small>
-        </div>
-        <Moon className="feature-illustration" aria-hidden="true" />
-        <div className="live-card-actions">
-          <button className="action-button primary" type="button" onClick={onAskLatest}>
-            Ask about this
-          </button>
-          <button className="action-button secondary" type="button" onClick={onAddLog}>
-            Log night wake
+          <span>Today’s guide</span>
+          <h2>How to reset a long night wake</h2>
+          <p>Use the latest log to choose one calm step before adding more stimulation.</p>
+          <button type="button" onClick={onAskLatest}>
+            Ask about this <ChevronRight aria-hidden="true" />
           </button>
         </div>
       </GlassCard>
       <LiveDailyBriefCard logs={logs} profile={profile} />
     </section>
+  )
+}
+
+function StatusMetric({ label, tone, value }: { label: string; tone: 'blush' | 'lavender' | 'mint'; value: string }) {
+  return (
+    <div className={`status-metric ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function QuickActionTiles({
+  onAsk,
+  onLog,
+  onSleep,
+}: {
+  onAsk: () => void
+  onLog: () => void
+  onSleep: () => void
+}) {
+  const actions = [
+    { label: 'Milk', Icon: Milk, tone: 'blush', onClick: onLog },
+    { label: 'Sleep', Icon: Moon, tone: 'lavender', onClick: onSleep },
+    { label: 'Diaper', Icon: Droplets, tone: 'mint', onClick: onLog },
+    { label: 'Ask', Icon: MessageCircle, tone: 'cream', onClick: onAsk },
+  ]
+
+  return (
+    <div className="premium-action-grid" aria-label="Quick actions">
+      {actions.map(({ Icon, label, onClick, tone }) => (
+        <button className={`premium-action-tile ${tone}`} key={label} type="button" onClick={onClick}>
+          <span>
+            <Icon aria-hidden="true" />
+          </span>
+          <strong>{label}</strong>
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -614,7 +699,28 @@ function LiveLogScreen({
   return (
     <section className="app-screen log-screen live-scroll-screen">
       <AppHeader profile={profile} />
-      <h1>Today’s log</h1>
+      <div className="premium-screen-title">
+        <h1>Growth & care</h1>
+        <p>Track the patterns that help Babio answer better.</p>
+      </div>
+      <GlassCard className="tracker-chart-card">
+        <div className="live-card-heading">
+          <h2>Today’s rhythm</h2>
+          <span>Last 24h</span>
+        </div>
+        <div className="soft-chart" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <div className="tracker-legend">
+          <span><Moon aria-hidden="true" /> Sleep</span>
+          <span><Milk aria-hidden="true" /> Feeding</span>
+          <span><Heart aria-hidden="true" /> Comfort</span>
+        </div>
+      </GlassCard>
       <GlassCard className="quick-log-card">
         <h2>Quick add</h2>
         <div className="quick-log-grid">
@@ -628,6 +734,10 @@ function LiveLogScreen({
         </div>
       </GlassCard>
       <GlassCard className="timeline-card live-timeline-card">
+        <div className="live-card-heading timeline-heading">
+          <h2>Recent care log</h2>
+          <span>{logs.length} items</span>
+        </div>
         {logs.map((item) => (
           <div className="timeline-row live-timeline-row" key={item.id}>
             <span>{item.time}</span>
@@ -702,6 +812,75 @@ function LiveAskScreen({
   )
 }
 
+function LiveSleepScreen({
+  logs,
+  onAskSleep,
+  profile,
+}: {
+  logs: BabioLogEntry[]
+  onAskSleep: () => void
+  profile: BabyProfileV2
+}) {
+  const sleepLog = logs.find((entry) => entry.kind === 'sleep')
+  const sounds = [
+    { label: 'White noise', Icon: Volume2, tone: 'blush' },
+    { label: 'Rain', Icon: Droplets, tone: 'lavender' },
+    { label: 'Lullaby', Icon: Headphones, tone: 'mint' },
+    { label: 'Heartbeat', Icon: Heart, tone: 'cream' },
+  ]
+
+  return (
+    <section className="app-screen sleep-screen live-scroll-screen">
+      <AppHeader profile={profile} />
+      <GlassCard className="sleep-sanctuary-card">
+        <Moon aria-hidden="true" />
+        <div>
+          <h1>Sleep sanctuary</h1>
+          <p>{sleepLog?.detail || 'A calm, low-stimulation reset for the next sleep window.'}</p>
+        </div>
+      </GlassCard>
+      <GlassCard className="sleep-player-card">
+        <Volume2 aria-hidden="true" />
+        <span>Now playing</span>
+        <h2>White Noise</h2>
+        <button aria-label="Pause white noise" type="button">
+          <Pause aria-hidden="true" />
+        </button>
+        <div className="sleep-timer" aria-label="Sleep timer">
+          <span className="active">15m</span>
+          <span>30m</span>
+          <span>1h</span>
+        </div>
+      </GlassCard>
+      <div className="sleep-library">
+        <div className="live-card-heading">
+          <h2>Sound library</h2>
+          <span>View all</span>
+        </div>
+        <div className="sleep-sound-grid">
+          {sounds.map(({ Icon, label, tone }) => (
+            <button className={`sleep-sound-tile ${tone}`} key={label} type="button">
+              <Icon aria-hidden="true" />
+              <strong>{label}</strong>
+            </button>
+          ))}
+        </div>
+      </div>
+      <GlassCard className="sleep-tip-card">
+        <Lamp aria-hidden="true" />
+        <div>
+          <h2>Gentle sleep tip</h2>
+          <p>Keep the reset boring: low light, steady sound, one repeated soothing step.</p>
+        </div>
+      </GlassCard>
+      <button className="action-button primary" type="button" onClick={onAskSleep}>
+        Ask about tonight
+        <SendHorizontal aria-hidden="true" />
+      </button>
+    </section>
+  )
+}
+
 function LiveGuidanceDecision({ onSave, result }: { onSave: () => void; result: GuidanceDecisionV2 }) {
   if (isSafetyRoute(result)) return <LiveSafetyRoute onSave={onSave} result={result} />
 
@@ -756,7 +935,7 @@ function LiveSafetyRoute({ onSave, result }: { onSave: () => void; result: Safet
   )
 }
 
-function LiveNotesScreen({
+function LiveLibraryScreen({
   notes,
   onCopy,
   onReset,
@@ -767,13 +946,52 @@ function LiveNotesScreen({
   onReset: () => void
   profile: BabyProfileV2
 }) {
+  const recommendations = [
+    { label: 'Sleep', title: 'The 5 S’s of a calmer reset', meta: '4 min guide' },
+    { label: 'Feeding', title: 'Latching and bottle rhythm', meta: '3 min guide' },
+    { label: 'Safety', title: 'When fever needs direct help', meta: 'Checklist' },
+  ]
+
   return (
-    <section className="app-screen notes-screen live-scroll-screen">
-      <header className="notes-header">
-        <h1>Notes</h1>
-        <BabySwitcher profile={profile} />
-      </header>
+    <section className="app-screen notes-screen library-screen live-scroll-screen">
+      <AppHeader profile={profile} />
+      <div className="premium-screen-title">
+        <h1>Care library</h1>
+        <p>Saved guidance, gentle tips, and pediatrician-ready notes.</p>
+      </div>
+      <div className="library-search" role="search">
+        <Search aria-hidden="true" />
+        <span>Search advice, notes, and guides...</span>
+      </div>
+      <GlassCard className="library-feature-card">
+        <img alt="" src={motherBabyCard} />
+        <div>
+          <span>Daily feature</span>
+          <h2>Why is my baby crying?</h2>
+          <p>Use recent sleep, feeding, and comfort logs before guessing.</p>
+        </div>
+      </GlassCard>
+      <div className="recommendation-list">
+        <div className="live-card-heading">
+          <h2>Recommended for you</h2>
+          <span>View all</span>
+        </div>
+        {recommendations.map((item) => (
+          <GlassCard className="recommendation-row" key={item.title}>
+            <span>{item.label}</span>
+            <div>
+              <strong>{item.title}</strong>
+              <small>{item.meta}</small>
+            </div>
+            <ChevronRight aria-hidden="true" />
+          </GlassCard>
+        ))}
+      </div>
       <PediatricianExportCard notes={notes} profile={profile} />
+      <div className="live-card-heading saved-heading">
+        <h2>Saved notes</h2>
+        <span>{notes.length}</span>
+      </div>
       {notes.map((note) => (
         <GlassCard className="note-card" key={note.id}>
           <div className="note-title">
@@ -797,6 +1015,7 @@ function LiveNotesScreen({
           Copy pediatrician summary
         </button>
         <button className="action-button secondary" type="button" onClick={onReset}>
+          <RotateCcw aria-hidden="true" />
           Reset demo
         </button>
       </div>
@@ -943,14 +1162,27 @@ function AppHeader({ centered = false, profile }: { centered?: boolean; profile?
   return (
     <header className={`app-header ${centered ? 'centered' : ''}`}>
       {centered ? <ArrowLeft className="back-icon" aria-label="Back" /> : null}
-      <BabioLogo />
-      <BabySwitcher profile={profile} />
+      <div className="brand-cluster">
+        <BabyAvatar profile={profile} />
+        <BabioLogo />
+      </div>
+      <button className="notification-button" aria-label="Notifications" type="button">
+        <Bell aria-hidden="true" />
+      </button>
     </header>
   )
 }
 
 function BabioLogo() {
   return <div className="babio-logo">Babio</div>
+}
+
+function BabyAvatar({ profile = babyProfile }: { profile?: BabyPillProfile }) {
+  return (
+    <span className="baby-avatar" aria-label={`${profile.name}, ${profile.ageLabel}`}>
+      {profile.avatarEmoji}
+    </span>
+  )
 }
 
 function BabySwitcher({ profile = babyProfile }: { profile?: BabyPillProfile }) {
@@ -1348,12 +1580,15 @@ function Toast({ text }: { text: string }) {
 
 const navItems: { tab: AppTab; label: string; Icon: LucideIcon; to: string }[] = [
   { tab: 'home', label: 'Home', Icon: Home, to: '/app/home' },
+  { tab: 'tracker', label: 'Tracker', Icon: ClipboardList, to: '/app/tracker' },
   { tab: 'ask', label: 'Ask', Icon: MessageCircle, to: '/app/ask' },
-  { tab: 'log', label: 'Log', Icon: ClipboardList, to: '/app/log' },
-  { tab: 'notes', label: 'Notes', Icon: NotebookTabs, to: '/app/notes' },
+  { tab: 'library', label: 'Library', Icon: BookOpen, to: '/app/library' },
+  { tab: 'sleep', label: 'Sleep', Icon: Headphones, to: '/app/sleep' },
 ]
 
 function BottomNav({ activeTab, recording }: { activeTab: AppTab; recording: boolean }) {
+  const canonicalActiveTab = canonicalAppTab(activeTab)
+
   return (
     <nav className="bottom-nav" aria-label="App navigation">
       {navItems.map(({ Icon, label, tab, to }) => {
@@ -1365,11 +1600,11 @@ function BottomNav({ activeTab, recording }: { activeTab: AppTab; recording: boo
         )
 
         return recording ? (
-          <span className={activeTab === tab ? 'active' : ''} key={tab}>
+          <span className={canonicalActiveTab === tab ? 'active' : ''} key={tab}>
             {content}
           </span>
         ) : (
-          <Link className={activeTab === tab ? 'active' : ''} key={tab} to={to}>
+          <Link className={canonicalActiveTab === tab ? 'active' : ''} key={tab} to={to}>
             {content}
           </Link>
         )
