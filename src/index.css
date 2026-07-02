@@ -1993,6 +1993,9 @@ a {
   justify-items: center;
   min-height: clamp(82px, 21cqw, 104px);
   padding: 10px 6px;
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 .premium-action-tile span {
@@ -2254,6 +2257,9 @@ a {
   grid-template-columns: clamp(58px, 15cqw, 72px) 1fr 20px;
   min-height: clamp(74px, 18.5cqw, 92px);
   padding: 10px 13px;
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 .recommendation-row > span {
@@ -2405,6 +2411,9 @@ a {
   min-height: clamp(118px, 30cqw, 148px);
   padding: 16px;
   text-align: left;
+  transition:
+    box-shadow 180ms ease,
+    transform 180ms ease;
 }
 
 .sleep-sound-tile svg {
@@ -2480,6 +2489,10 @@ a {
   gap: 4px;
   min-width: 0;
   padding: 7px 3px;
+  transition:
+    background 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
 }
 
 .bottom-nav svg {
@@ -2502,4 +2515,21 @@ a {
   border: 1px solid rgba(83, 64, 56, 0.1);
   box-shadow: 0 18px 50px rgba(86, 68, 54, 0.2);
   color: var(--color-text);
+}
+
+.premium-action-tile:active,
+.recommendation-row:active,
+.sleep-sound-tile:active,
+.action-button:active,
+.bottom-nav a:active {
+  transform: scale(0.985);
+}
+
+@media (hover: hover) {
+  .premium-action-tile:hover,
+  .recommendation-row:hover,
+  .sleep-sound-tile:hover {
+    box-shadow: 0 16px 34px rgba(86, 68, 54, 0.13);
+    transform: translateY(-1px);
+  }
 }
