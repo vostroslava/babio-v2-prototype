@@ -77,6 +77,7 @@ import type {
   RecordingOptions,
   SafetyGatewayState,
   ScreenKind,
+  TypingAskRecordState,
 } from './types'
 import type {
   BabyProfileV2,
@@ -398,6 +399,7 @@ function statusBarTimeForScreen(flow: FlowDefinition, screen: ScreenKind) {
   if (screen === 'profile') return flow.screens.profile?.statusBarTime || flow.statusBarTime
   if (screen === 'profileSummary') return flow.screens.profileSummary?.statusBarTime || flow.statusBarTime
   if (screen === 'exploreCommunity') return flow.screens.exploreCommunity?.statusBarTime || flow.statusBarTime
+  if (screen === 'typingAsk' || screen === 'typingAskReady') return flow.screens.typingAsk?.statusBarTime || flow.statusBarTime
   if (screen === 'guidancePreparing') return flow.screens.guidancePreparing?.statusBarTime || flow.statusBarTime
   return flow.statusBarTime
 }
@@ -1713,6 +1715,16 @@ function ScreenRenderer({
   if (screen === 'profile') return <ProfileRecordScreen state={flow.screens.profile!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'exploreCommunity') return <ExploreCommunityRecordScreen state={flow.screens.exploreCommunity!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'profileSummary') return <ProfileSummaryRecordScreen state={flow.screens.profileSummary!} onAction={onAction} tapTarget={tapTarget} />
+  if (screen === 'typingAsk' || screen === 'typingAskReady') {
+    return (
+      <TypingAskRecordScreen
+        ready={screen === 'typingAskReady'}
+        state={flow.screens.typingAsk!}
+        onAction={onAction}
+        tapTarget={tapTarget}
+      />
+    )
+  }
   if (screen === 'ask') return <AskScreen state={flow.screens.ask!} onAction={onAction} tapTarget={tapTarget} />
   if (screen === 'loading') return <LoadingScreen state={flow.screens.loading} />
   if (screen === 'guidancePreparing') return <GuidancePreparingScreen state={flow.screens.guidancePreparing!} />
@@ -2087,6 +2099,81 @@ function AskScreen({
   )
 }
 
+function TypingAskRecordScreen({
+  ready,
+  state,
+  onAction,
+  tapTarget,
+}: {
+  ready: boolean
+  state: TypingAskRecordState
+  onAction: (action?: string) => void
+  tapTarget?: string
+}) {
+  return (
+    <section className={`app-screen ask-screen typing-ask-screen ${ready ? 'is-ready' : ''}`}>
+      <AppHeader profile={state.profile} />
+      <h1>{state.title}</h1>
+      <p className="screen-subtitle">{state.subtitle}</p>
+      <GlassCard className="live-ask-form guidance-form-card typing-guidance-card">
+        <div className="ask-form-heading">
+          <span>Personalized guidance</span>
+          <h2>Tell Babio what happened</h2>
+          <p>Babio uses {state.profile.name}’s profile, recent log, and safety signals before giving one next step.</p>
+        </div>
+        <div className="readonly-guidance-input typing-guidance-input" aria-label="Typed question">
+          <span className="typing-text">{state.typedText}</span>
+          <span className="typing-caret" aria-hidden="true" />
+        </div>
+        <div className="guidance-context-strip compact" aria-label="Guidance context">
+          {state.quickContext.map((item) => (
+            <GuidanceContextPill
+              Icon={iconComponentForName(item.icon)}
+              key={`${item.label}-${item.value}`}
+              label={item.label}
+              value={item.value}
+            />
+          ))}
+        </div>
+        {ready ? (
+          <GuidanceSubmitAction action={state.primaryAction} onAction={onAction} tapTarget={tapTarget} />
+        ) : (
+          <button className="action-button primary guidance-submit-button" type="button" disabled>
+            <span>{state.primaryAction.label}</span>
+            <SendHorizontal aria-hidden="true" />
+          </button>
+        )}
+      </GlassCard>
+      <FakeIosKeyboard />
+    </section>
+  )
+}
+
+function FakeIosKeyboard() {
+  const rows = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM']
+
+  return (
+    <div className="fake-ios-keyboard" aria-hidden="true">
+      {rows.map((row, rowIndex) => (
+        <div className={`keyboard-row row-${rowIndex + 1}`} key={row}>
+          {rowIndex === 2 ? <span className="keyboard-key utility">shift</span> : null}
+          {Array.from(row).map((letter) => (
+            <span className="keyboard-key" key={letter}>
+              {letter}
+            </span>
+          ))}
+          {rowIndex === 2 ? <span className="keyboard-key utility">delete</span> : null}
+        </div>
+      ))}
+      <div className="keyboard-row row-4">
+        <span className="keyboard-key utility wide">123</span>
+        <span className="keyboard-key space">space</span>
+        <span className="keyboard-key utility wide">return</span>
+      </div>
+    </div>
+  )
+}
+
 function SupportChips({ chips }: { chips: string[] }) {
   return (
     <div className="support-chip-row">
@@ -2131,7 +2218,7 @@ function GuidancePreparingScreen({ state }: { state: GuidancePreparingState }) {
         <div className="ask-form-heading">
           <span>Personalized guidance</span>
           <h2>Tell Babio what happened</h2>
-          <p>Babio uses Emma’s profile, recent log, and safety signals before giving one next step.</p>
+          <p>Babio uses the profile, recent log, and safety signals before giving one next step.</p>
         </div>
         <div className="readonly-guidance-input compact" aria-label="Question">
           {state.input}

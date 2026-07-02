@@ -8,6 +8,7 @@ import type {
   FlowId,
   FlowMoment,
   GuidanceResult,
+  GuidancePreparingState,
   HomeState,
   ExploreCommunityRecordState,
   LogItem,
@@ -15,6 +16,7 @@ import type {
   ProfileRecordState,
   ProfileSummaryRecordState,
   SafetyGatewayState,
+  TypingAskRecordState,
 } from '../types'
 
 export const babyProfile: BabyProfile = {
@@ -261,6 +263,55 @@ const communityAsk: AskState = {
     variant: 'primary',
     action: 'show-loading',
   },
+}
+
+const teethingTypingAsk: TypingAskRecordState = {
+  statusBarTime: '8:18 PM',
+  title: 'Ask Babio',
+  subtitle: 'A structured answer, not an open chat.',
+  profile: {
+    name: 'Mia',
+    ageLabel: '6 mo',
+    avatarEmoji: '🙂',
+  },
+  typedText: 'My baby is teething and crying at night.',
+  quickContext: [
+    { icon: 'baby', label: 'Mia', value: '6 mo' },
+    { icon: 'thermometer', label: 'Fever', value: 'No' },
+    { icon: 'diaper', label: 'Diapers', value: 'Normal' },
+  ],
+  primaryAction: {
+    label: 'Get Personalized Guidance',
+    variant: 'primary',
+    action: 'show-loading',
+  },
+}
+
+const teethingGuidancePreparing: GuidancePreparingState = {
+  statusBarTime: '8:18 PM',
+  title: 'Ask Babio',
+  subtitle: 'A structured answer, not an open chat.',
+  input: teethingTypingAsk.typedText,
+  contextCards: teethingTypingAsk.quickContext,
+  loadingTitle: 'Personalizing guidance',
+  loadingBody: 'Babio is checking Mia’s age, tonight’s note, and safety signals.',
+  loadingItems: ['Reading Mia’s profile', 'Checking fever + diaper signals'],
+}
+
+const teethingResult: GuidanceResult = {
+  title: 'Personalized guidance',
+  subtitle: 'Because Mia is 6 mo, has no fever, and wet diapers look normal.',
+  contextCards: teethingTypingAsk.quickContext,
+  mainCardTitle: 'Try first',
+  steps: [
+    {
+      index: 1,
+      icon: 'heart',
+      title: 'Massage her gums with a clean finger or offer a chilled, not frozen, teething ring.',
+    },
+  ],
+  primaryAction: { label: 'Save guidance', variant: 'primary', action: 'save-note' },
+  presentation: 'screencast',
 }
 
 const feedingResult: GuidanceResult = {
@@ -876,6 +927,34 @@ export const flows: Record<FlowId, FlowDefinition> = {
       { atMs: 7200, screen: 'result' },
     ],
   },
+  'teething-keyboard-ask': {
+    id: 'teething-keyboard-ask',
+    title: 'Teething Keyboard Ask',
+    description: 'Short screencast: keyboard types a teething question, then Babio returns one credible next step.',
+    version: 'v2',
+    moment: 'comfort',
+    recordingDurationMs: 7600,
+    statusBarTime: '8:18 PM',
+    startTab: 'ask',
+    initialScreen: 'typingAsk',
+    manualSequence: ['typingAskReady', 'guidancePreparing', 'result'],
+    screens: {
+      typingAsk: teethingTypingAsk,
+      loading: {
+        title: 'Personalizing guidance...',
+        items: ['Mia, 6 mo', 'No fever', 'Wet diapers normal'],
+      },
+      guidancePreparing: teethingGuidancePreparing,
+      result: teethingResult,
+    },
+    timeline: [
+      { atMs: 0, screen: 'typingAsk' },
+      { atMs: 3300, screen: 'typingAskReady', tapTarget: 'Get Personalized Guidance' },
+      { atMs: 4300, screen: 'guidancePreparing' },
+      { atMs: 5500, screen: 'result' },
+      { atMs: 7600, screen: 'result' },
+    ],
+  },
   'profile-overview': {
     id: 'profile-overview',
     title: 'Profile Overview',
@@ -1150,6 +1229,7 @@ export const flowOrder: FlowId[] = [
   'baby-woke-up-again',
   'night-reset-woke-again',
   'personalized-guidance-cta',
+  'teething-keyboard-ask',
   'profile-overview',
   'community-to-guidance',
   'profile-pediatrician-summary',

@@ -35,6 +35,7 @@ http://127.0.0.1:5174/studio
 
 ```text
 http://127.0.0.1:5174/record/personalized-guidance-cta?autoplay=1&bg=navy&format=phone&frame=phone
+http://127.0.0.1:5174/record/teething-keyboard-ask?autoplay=1&bg=navy&format=phone&frame=phone
 http://127.0.0.1:5174/record/profile-overview?autoplay=1&bg=navy&format=phone&frame=phone
 http://127.0.0.1:5174/record/community-to-guidance?autoplay=1&bg=navy&format=phone&frame=phone
 http://127.0.0.1:5174/record/profile-pediatrician-summary?autoplay=1&bg=navy&format=phone&frame=phone
@@ -68,7 +69,7 @@ npm run test
 
 ## V2 Status
 
-- 20 total scripted flows in Studio.
+- 21 total scripted flows in Studio.
 - Live local core loop: Home, Tracker, Ask, Explore, Profile.
 - Explore preserves Library and Sleep as sections; Profile owns baby context and saved notes.
 - Premium light baby-care visual pass with warm surfaces, pastel actions, photo guidance card, and five-tab bottom navigation.

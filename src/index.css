@@ -801,6 +801,7 @@ a {
 
 .result-screen-compact .context-grid {
   gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .result-screen-compact .context-card {
@@ -823,7 +824,15 @@ a {
 }
 
 .result-screen-compact .advice-step {
+  gap: 9px;
+  grid-template-columns: clamp(28px, 7.2cqw, 34px) clamp(30px, 7.8cqw, 38px) 1fr;
   min-height: clamp(62px, 15.2cqw, 76px);
+  padding: clamp(10px, 2.7cqw, 14px);
+}
+
+.result-screen-compact .advice-step strong {
+  font-size: clamp(15px, 4.05cqw, 18px);
+  line-height: 1.14;
 }
 
 .result-screen-compact .support-note,
@@ -1416,6 +1425,10 @@ a {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.guidance-context-strip.compact {
+  gap: 7px;
+}
+
 .guidance-context-pill {
   background: rgba(248, 243, 235, 0.78);
   border: 1px solid rgba(83, 64, 56, 0.08);
@@ -1424,6 +1437,11 @@ a {
   gap: 4px;
   min-height: clamp(72px, 18cqw, 90px);
   padding: 10px;
+}
+
+.guidance-context-strip.compact .guidance-context-pill {
+  min-height: clamp(58px, 14.8cqw, 74px);
+  padding: 8px;
 }
 
 .guidance-context-pill svg {
@@ -1462,6 +1480,139 @@ a {
 .guidance-submit-button svg {
   height: clamp(20px, 5.3cqw, 26px);
   width: clamp(20px, 5.3cqw, 26px);
+}
+
+.typing-ask-screen {
+  gap: clamp(8px, 2.25cqw, 12px);
+  padding-bottom: 92px;
+}
+
+.typing-ask-screen h1 {
+  font-size: clamp(30px, 8.4cqw, 42px);
+}
+
+.typing-ask-screen .screen-subtitle {
+  font-size: clamp(14px, 3.7cqw, 18px);
+  margin-top: -4px;
+}
+
+.typing-guidance-card {
+  gap: 10px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  padding: clamp(13px, 3.55cqw, 18px);
+}
+
+.typing-guidance-card .ask-form-heading {
+  gap: 3px;
+}
+
+.typing-guidance-card .ask-form-heading p {
+  font-size: clamp(12px, 3.15cqw, 14px);
+}
+
+.typing-guidance-input {
+  min-height: clamp(74px, 19cqw, 94px);
+  overflow: hidden;
+  position: relative;
+}
+
+.typing-text {
+  animation: typingReveal 2.25s steps(40, end) 0.55s both;
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.typing-caret {
+  animation: caretBlink 0.72s steps(1, end) infinite;
+  background: var(--color-teal-strong);
+  border-radius: 99px;
+  display: inline-block;
+  height: 1.12em;
+  margin-left: 2px;
+  transform: translateY(0.16em);
+  width: 2px;
+}
+
+.typing-ask-screen.is-ready .typing-text {
+  animation: none;
+  width: auto;
+  white-space: normal;
+}
+
+.typing-ask-screen.is-ready .typing-caret {
+  opacity: 0;
+}
+
+.typing-ask-screen .guidance-submit-button:disabled {
+  background: linear-gradient(180deg, #ecc3c0, #dea09a);
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.typing-ask-screen .guidance-submit-button {
+  font-size: clamp(13px, 3.35cqw, 16px);
+  line-height: 1.1;
+  white-space: normal;
+}
+
+.fake-ios-keyboard {
+  animation: keyboardSlideUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+  background: rgba(239, 232, 224, 0.96);
+  border: 1px solid rgba(83, 64, 56, 0.08);
+  border-radius: 22px 22px 18px 18px;
+  box-shadow: 0 -16px 34px rgba(86, 68, 54, 0.12);
+  display: grid;
+  gap: 7px;
+  margin-top: auto;
+  padding: 10px 8px 12px;
+}
+
+.keyboard-row {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+}
+
+.keyboard-row.row-2 {
+  padding: 0 13px;
+}
+
+.keyboard-key {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 8px;
+  box-shadow: 0 1px 0 rgba(83, 64, 56, 0.17), 0 3px 5px rgba(83, 64, 56, 0.08);
+  color: #2a2528;
+  display: inline-flex;
+  flex: 1 1 0;
+  font-size: clamp(12px, 3cqw, 14px);
+  font-weight: 760;
+  height: clamp(28px, 7.2cqw, 36px);
+  justify-content: center;
+  min-width: 0;
+  text-transform: lowercase;
+}
+
+.keyboard-key.utility {
+  background: #d8d0c9;
+  color: #5c5559;
+  flex: 1.22 1 0;
+  font-size: clamp(8px, 2.2cqw, 11px);
+}
+
+.keyboard-key.wide {
+  flex: 1.6 1 0;
+}
+
+.keyboard-key.space {
+  flex: 4.6 1 0;
+  color: #7a7175;
+  font-size: clamp(10px, 2.7cqw, 13px);
 }
 
 .guidance-preparing-card {
@@ -1943,6 +2094,37 @@ a {
 @keyframes shimmer {
   to {
     transform: translateX(100%);
+  }
+}
+
+@keyframes typingReveal {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes caretBlink {
+  0%,
+  48% {
+    opacity: 1;
+  }
+  49%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes keyboardSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(34px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

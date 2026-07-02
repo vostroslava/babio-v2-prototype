@@ -55,6 +55,7 @@ const requiredRoutes = [
   'baby-woke-up-again',
   'night-reset-woke-again',
   'personalized-guidance-cta',
+  'teething-keyboard-ask',
   'profile-overview',
   'community-to-guidance',
   'profile-pediatrician-summary',

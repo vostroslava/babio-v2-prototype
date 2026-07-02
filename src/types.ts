@@ -2,6 +2,7 @@ export type FlowId =
   | 'baby-woke-up-again'
   | 'night-reset-woke-again'
   | 'personalized-guidance-cta'
+  | 'teething-keyboard-ask'
   | 'profile-overview'
   | 'community-to-guidance'
   | 'profile-pediatrician-summary'
@@ -34,6 +35,8 @@ export type ScreenKind =
   | 'profile'
   | 'profileSummary'
   | 'exploreCommunity'
+  | 'typingAsk'
+  | 'typingAskReady'
   | 'loading'
   | 'guidancePreparing'
   | 'result'
@@ -177,6 +180,7 @@ export interface FlowScreens {
   ask?: AskState
   loading: LoadingState
   guidancePreparing?: GuidancePreparingState
+  typingAsk?: TypingAskRecordState
   profile?: ProfileRecordState
   profileSummary?: ProfileSummaryRecordState
   exploreCommunity?: ExploreCommunityRecordState
@@ -221,6 +225,16 @@ export interface ExploreCommunityRecordState {
     parentSignal: string
     safetyNote: string
   }
+  primaryAction: ActionButton
+}
+
+export interface TypingAskRecordState {
+  statusBarTime: string
+  title: string
+  subtitle: string
+  profile: Pick<BabyProfile, 'name' | 'ageLabel' | 'avatarEmoji'>
+  typedText: string
+  quickContext: ContextCard[]
   primaryAction: ActionButton
 }
 
