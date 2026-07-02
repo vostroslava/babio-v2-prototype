@@ -108,7 +108,7 @@ const nightResetAsk: AskState = {
     { icon: 'note', label: 'Notes', value: 'Ready' },
   ],
   primaryAction: {
-    label: 'Get one calm step',
+    label: 'Get Personalized Guidance',
     variant: 'primary',
     action: 'show-loading',
   },
@@ -295,7 +295,7 @@ function makeGuidanceFlow(spec: GuidanceFlowSpec): FlowDefinition {
         quickContext: spec.contextCards,
         chips: spec.chips,
         primaryAction: {
-          label: 'Get one calm step',
+          label: 'Get Personalized Guidance',
           variant: 'primary',
           action: 'show-loading',
         },
@@ -309,7 +309,7 @@ function makeGuidanceFlow(spec: GuidanceFlowSpec): FlowDefinition {
     },
     timeline: [
       { atMs: 0, screen: 'ask' },
-      { atMs: 750, screen: 'ask', tapTarget: 'Get one calm step' },
+      { atMs: 750, screen: 'ask', tapTarget: 'Get Personalized Guidance' },
       { atMs: 1050, screen: 'loading' },
       { atMs: 2250, screen: 'result' },
       { atMs: 5400, screen: 'result', tapTarget: 'Save to Notes' },
@@ -716,7 +716,7 @@ export const flows: Record<FlowId, FlowDefinition> = {
       { atMs: 0, screen: 'home' },
       { atMs: 700, screen: 'home', tapTarget: 'Ask about this' },
       { atMs: 1000, screen: 'ask' },
-      { atMs: 1900, screen: 'ask', tapTarget: 'Get one calm step' },
+      { atMs: 1900, screen: 'ask', tapTarget: 'Get Personalized Guidance' },
       { atMs: 2200, screen: 'loading' },
       { atMs: 3400, screen: 'result' },
       { atMs: 6100, screen: 'result', tapTarget: 'Save to Notes' },

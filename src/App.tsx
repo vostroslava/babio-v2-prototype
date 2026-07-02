@@ -38,7 +38,7 @@ import {
   Wifi,
 } from 'lucide-react'
 import type { ComponentType, FormEvent, SVGProps } from 'react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   BrowserRouter,
   Link,
@@ -774,16 +774,34 @@ function LiveAskScreen({
   sourceLog?: BabioLogEntry
 }) {
   const [input, setInput] = useState(sourceLog?.askPrompt || lastAsk?.input || 'She woke again and stayed awake.')
+  const [isPreparing, setIsPreparing] = useState(false)
+  const submitTimerRef = useRef<number | undefined>(undefined)
+  const latestLog = sourceLog || logs[0]
 
   useEffect(() => {
     if (sourceLog?.askPrompt) setInput(sourceLog.askPrompt)
   }, [sourceLog?.askPrompt])
 
+  useEffect(() => {
+    if (lastAsk) setIsPreparing(false)
+  }, [lastAsk])
+
+  useEffect(() => {
+    return () => {
+      if (submitTimerRef.current) window.clearTimeout(submitTimerRef.current)
+    }
+  }, [])
+
   const submitAsk = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmed = input.trim()
     if (!trimmed) return
-    onSubmit(trimmed)
+    setIsPreparing(true)
+
+    if (submitTimerRef.current) window.clearTimeout(submitTimerRef.current)
+    submitTimerRef.current = window.setTimeout(() => {
+      onSubmit(trimmed)
+    }, 1150)
   }
 
   return (
@@ -791,24 +809,101 @@ function LiveAskScreen({
       <AppHeader profile={profile} />
       <h1>Ask Babio</h1>
       <p className="screen-subtitle">A structured answer, not an open chat.</p>
-      <form className={`live-ask-form ${lastAsk ? 'compact' : ''}`} onSubmit={submitAsk}>
-        <textarea value={input} onChange={(event) => setInput(event.target.value)} />
-        <button className="action-button primary" type="submit">
-          Get Personalized Guidance
+      <form className={`live-ask-form guidance-form-card ${lastAsk ? 'compact' : ''} ${isPreparing ? 'is-preparing' : ''}`} onSubmit={submitAsk}>
+        <div className="ask-form-heading">
+          <span>Personalized guidance</span>
+          <h2>{lastAsk ? 'Ask another detail' : 'Tell Babio what happened'}</h2>
+          <p>Babio uses Emma’s profile, recent log, and safety signals before giving one next step.</p>
+        </div>
+        <label className="sr-only" htmlFor="babio-guidance-input">
+          What happened?
+        </label>
+        <textarea
+          id="babio-guidance-input"
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          disabled={isPreparing}
+        />
+        {!isPreparing ? (
+          <div className="guidance-context-strip" aria-label="Guidance context">
+            <GuidanceContextPill Icon={Baby} label="Profile" value={`${profile.name}, ${profile.ageLabel}`} />
+            <GuidanceContextPill
+              Icon={latestLog ? iconComponentForLogKind(latestLog.kind) : NotebookTabs}
+              label="Latest log"
+              value={latestLog?.time || 'Not yet'}
+            />
+            <GuidanceContextPill Icon={ShieldPlus} label="Safety" value="Checked first" />
+          </div>
+        ) : null}
+        <button className="action-button primary guidance-submit-button" type="submit" disabled={isPreparing || !input.trim()}>
+          {isPreparing ? (
+            <>
+              <Sparkles aria-hidden="true" />
+              Preparing guidance...
+            </>
+          ) : (
+            <>
+              Get Personalized Guidance
+              <SendHorizontal aria-hidden="true" />
+            </>
+          )}
         </button>
       </form>
-      {!lastAsk ? (
-        <div className="quick-context">
-          <h2>Quick context</h2>
-          <div>
-            <ContextCard item={{ icon: 'baby', label: profile.name, value: profile.ageLabel }} />
-            <ContextCard item={{ icon: iconForLogKind(logs[0]?.kind || 'sleep'), label: 'Latest', value: logs[0]?.time || 'None' }} />
-            <ContextCard item={{ icon: 'note', label: 'Notes', value: 'Not yet' }} />
-          </div>
-        </div>
-      ) : null}
-      {lastAsk ? <LiveGuidanceDecision result={lastAsk.result} onSave={onSave} /> : null}
+      {isPreparing ? <GuidancePreparingCard latestLog={latestLog} profile={profile} /> : null}
+      {lastAsk && !isPreparing ? <LiveGuidanceDecision result={lastAsk.result} onSave={onSave} /> : null}
     </section>
+  )
+}
+
+function GuidanceContextPill({
+  Icon,
+  label,
+  value,
+}: {
+  Icon: LucideIcon
+  label: string
+  value: string
+}) {
+  return (
+    <div className="guidance-context-pill">
+      <Icon aria-hidden="true" />
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function GuidancePreparingCard({
+  latestLog,
+  profile,
+}: {
+  latestLog?: BabioLogEntry
+  profile: BabyProfileV2
+}) {
+  const rows = [
+    latestLog ? `Reading ${profile.name}'s profile + latest log` : `Reading ${profile.name}'s profile`,
+    'Checking safety signals before advice',
+  ]
+
+  return (
+    <GlassCard className="guidance-preparing-card" role="status" aria-live="polite">
+      <div className="guidance-preparing-heading">
+        <Sparkles aria-hidden="true" />
+        <div>
+          <h2>Personalizing guidance</h2>
+          <p>Babio is turning the context into one safe next step.</p>
+        </div>
+      </div>
+      <div className="guidance-progress-line" aria-hidden="true" />
+      <div className="guidance-preparing-rows">
+        {rows.map((row, index) => (
+          <div className="guidance-preparing-row" key={row}>
+            <span>{index + 1}</span>
+            <strong>{row}</strong>
+          </div>
+        ))}
+      </div>
+    </GlassCard>
   )
 }
 
@@ -1065,6 +1160,14 @@ function iconForLogKind(kind: BabioLogKind) {
   if (kind === 'comfort') return 'heart'
   if (kind === 'routine') return 'flag'
   return kind
+}
+
+function iconComponentForLogKind(kind: BabioLogKind): LucideIcon {
+  if (kind === 'feed') return Milk
+  if (kind === 'diaper') return Droplets
+  if (kind === 'comfort') return Heart
+  if (kind === 'routine') return Flag
+  return Moon
 }
 
 function ScreenRenderer({
@@ -1529,8 +1632,16 @@ function SafetyCard({ text }: { text: string }) {
   )
 }
 
-function GlassCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`glass-card ${className}`}>{children}</div>
+function GlassCard({
+  children,
+  className = '',
+  ...props
+}: React.HTMLAttributes<HTMLDivElement> & { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`glass-card ${className}`} {...props}>
+      {children}
+    </div>
+  )
 }
 
 function ActionButtonView({
